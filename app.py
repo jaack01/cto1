@@ -12,6 +12,8 @@ from validation import (
     show_info, confirm_action
 )
 from notifications import NotificationManager, NotificationConfig
+from dashboard import DashboardFrame
+from reporting import ReportingFrame
 
 
 class OrderManagementApp:
@@ -20,7 +22,7 @@ class OrderManagementApp:
     def __init__(self, root):
         self.root = root
         self.root.title("Order Management System")
-        self.root.geometry("1000x700")
+        self.root.geometry("1200x800")
         
         self.db = Database()
         self.notification_manager = NotificationManager()
@@ -80,18 +82,37 @@ class OrderManagementApp:
         """Create main application layout."""
         main_container = ttk.Frame(self.root, padding="10")
         main_container.pack(fill=tk.BOTH, expand=True)
+
+        notebook = ttk.Notebook(main_container)
+        notebook.pack(fill=tk.BOTH, expand=True)
+
+        # Dashboard Tab
+        dashboard_tab = DashboardFrame(notebook, self.db)
+        notebook.add(dashboard_tab, text="Dashboard")
+
+        # Orders Tab
+        orders_tab = self.create_orders_tab(notebook)
+        notebook.add(orders_tab, text="Orders")
+
+        # Reporting Tab
+        reporting_tab = ReportingFrame(notebook, self.db)
+        notebook.add(reporting_tab, text="Reporting")
+
+    def create_orders_tab(self, parent):
+        """Create the orders tab content."""
+        orders_container = ttk.Frame(parent, padding="10")
         
-        title_frame = ttk.Frame(main_container)
+        title_frame = ttk.Frame(orders_container)
         title_frame.pack(fill=tk.X, pady=(0, 10))
         
-        title_label = ttk.Label(title_frame, text="Order Management System", 
+        title_label = ttk.Label(title_frame, text="Order Management", 
                                style='Title.TLabel')
         title_label.pack(side=tk.LEFT)
         
         self.stats_label = ttk.Label(title_frame, text="")
         self.stats_label.pack(side=tk.RIGHT)
         
-        toolbar_frame = ttk.Frame(main_container)
+        toolbar_frame = ttk.Frame(orders_container)
         toolbar_frame.pack(fill=tk.X, pady=(0, 10))
         
         ttk.Button(toolbar_frame, text="New Order", 
@@ -116,7 +137,7 @@ class OrderManagementApp:
         filter_combo.bind('<<ComboboxSelected>>', lambda e: self.filter_orders(
             None if self.filter_var.get() == 'all' else self.filter_var.get()))
         
-        tree_frame = ttk.Frame(main_container)
+        tree_frame = ttk.Frame(orders_container)
         tree_frame.pack(fill=tk.BOTH, expand=True)
         
         tree_scroll_y = ttk.Scrollbar(tree_frame, orient=tk.VERTICAL)
@@ -159,10 +180,12 @@ class OrderManagementApp:
         
         self.tree.bind('<Double-1>', lambda e: self.edit_selected_order())
         
-        status_bar = ttk.Frame(main_container)
+        status_bar = ttk.Frame(orders_container)
         status_bar.pack(fill=tk.X, pady=(10, 0))
         self.status_label = ttk.Label(status_bar, text="Ready")
         self.status_label.pack(side=tk.LEFT)
+
+        return orders_container
     
     def load_orders(self):
         """Load orders from database and display in tree view."""
