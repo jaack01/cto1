@@ -3,7 +3,7 @@ Database module for order management.
 """
 import sqlite3
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
 from contextlib import contextmanager
 
 
@@ -246,3 +246,72 @@ class Database:
                 'completed_orders': completed_orders,
                 'total_revenue': total_revenue
             }
+
+    def get_daily_revenue(self):
+        """Get total revenue for the current day."""
+        today = datetime.now().strftime('%Y-%m-%d')
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT COALESCE(SUM(total_price), 0) as total FROM orders WHERE date(created_at) = ?", (today,))
+            return cursor.fetchone()['total']
+
+    def get_pending_orders_count(self):
+        """Get the count of pending orders."""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT COUNT(*) as count FROM orders WHERE status = 'pending'")
+            return cursor.fetchone()['count']
+
+    def get_new_customers_count(self):
+        """Get the count of new customers in the last 24 hours."""
+        yesterday = (datetime.now() - timedelta(days=1)).isoformat()
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT COUNT(DISTINCT customer_email) as count FROM orders WHERE created_at >= ?", (yesterday,))
+            return cursor.fetchone()['count']
+
+    def get_popular_items(self, limit=5):
+        """Get the most popular items."""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT item_description as item, COUNT(*) as orders
+                FROM orders
+                GROUP BY item_description
+                ORDER BY orders DESC
+                LIMIT ?
+            """, (limit,))
+            return [dict(row) for row in cursor.fetchall()]
+
+    def get_sales_report(self, start_date, end_date):
+        """Get a sales report for a given date range."""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            query = "SELECT * FROM orders WHERE date(created_at) BETWEEN ? AND ?"
+            cursor.execute(query, (start_date, end_date))
+            orders = [dict(row) for row in cursor.fetchall()]
+
+            total_revenue = sum(o['total_price'] for o in orders)
+            completed_orders = sum(1 for o in orders if o['status'] == 'completed')
+            pending_orders = sum(1 for o in orders if o['status'] == 'pending')
+
+            return {
+                'total_orders': len(orders),
+                'total_revenue': total_revenue,
+                'completed_orders': completed_orders,
+                'pending_orders': pending_orders
+            }
+
+    def get_all_customers(self):
+        """Get all unique customers."""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT DISTINCT customer_name, customer_email, customer_phone FROM orders")
+            return [dict(row) for row in cursor.fetchall()]
+
+    def get_completed_orders(self):
+        """Get all completed orders."""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM orders WHERE status = 'completed'")
+            return [dict(row) for row in cursor.fetchall()]
