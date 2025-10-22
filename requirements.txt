@@ -1,0 +1,24 @@
+# Order Management System - Python Dependencies
+#
+# This application primarily uses Python standard library modules.
+# No external packages are required for core functionality.
+#
+# Python 3.7+ includes all required modules:
+# - tkinter (GUI framework)
+# - sqlite3 (database)
+# - smtplib (email)
+# - re (validation)
+# - datetime (timestamps)
+# - logging (logging)
+
+# Optional: For development and testing
+# pytest>=7.0.0
+# pytest-cov>=3.0.0
+
+# Optional: For enhanced SMS integration (requires provider-specific SDK)
+# twilio>=8.0.0  # For Twilio SMS integration
+# boto3>=1.26.0  # For AWS SNS SMS integration
+
+# Optional: For future enhancements
+# reportlab>=3.6.0  # For PDF generation
+# pillow>=9.0.0  # For image handling
