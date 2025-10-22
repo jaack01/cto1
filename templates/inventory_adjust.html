@@ -1,0 +1,155 @@
+{% extends "base.html" %}
+
+{% block title %}Adjust Stock - {{ item.name }} - Inventory Management{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pb-2 mb-3 border-bottom">
+    <h1 class="h2">Adjust Stock - {{ item.name }}</h1>
+</div>
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-body">
+                <div class="alert alert-info mb-4">
+                    <strong>Current Stock:</strong> {{ item.quantity }} {{ item.unit }}
+                </div>
+
+                <form method="POST" novalidate>
+                    {{ form.hidden_tag() }}
+                    
+                    <div class="mb-3">
+                        <label for="transaction_type" class="form-label">{{ form.transaction_type.label }}</label>
+                        {{ form.transaction_type(class="form-select" + (" is-invalid" if form.transaction_type.errors else "")) }}
+                        {% if form.transaction_type.errors %}
+                            <div class="invalid-feedback">
+                                {% for error in form.transaction_type.errors %}{{ error }}{% endfor %}
+                            </div>
+                        {% endif %}
+                        <small class="form-text text-muted">
+                            Note: Purchase/Restock adds to stock, while Usage/Damage/Return deducts from stock
+                        </small>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="quantity" class="form-label">{{ form.quantity.label }}</label>
+                        <div class="input-group">
+                            {{ form.quantity(class="form-control" + (" is-invalid" if form.quantity.errors else "")) }}
+                            <span class="input-group-text">{{ item.unit }}</span>
+                        </div>
+                        {% if form.quantity.errors %}
+                            <div class="invalid-feedback d-block">
+                                {% for error in form.quantity.errors %}{{ error }}{% endfor %}
+                            </div>
+                        {% endif %}
+                        <small class="form-text text-muted">Enter the absolute quantity (will be positive or negative based on transaction type)</small>
+                    </div>
+
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="reference_type" class="form-label">{{ form.reference_type.label }}</label>
+                            {{ form.reference_type(class="form-control", placeholder="e.g., Service Order, Purchase Order") }}
+                            <small class="form-text text-muted">Optional</small>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="reference_id" class="form-label">{{ form.reference_id.label }}</label>
+                            {{ form.reference_id(class="form-control", placeholder="e.g., SO-123, PO-456") }}
+                            <small class="form-text text-muted">Optional</small>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="notes" class="form-label">{{ form.notes.label }}</label>
+                        {{ form.notes(class="form-control", rows="3", placeholder="Additional notes about this transaction...") }}
+                    </div>
+
+                    <div class="d-flex justify-content-between">
+                        <a href="{{ url_for('inventory_detail', id=item.id) }}" class="btn btn-secondary">
+                            <i class="bi bi-arrow-left"></i> Cancel
+                        </a>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-check-circle"></i> Apply Adjustment
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <div class="card mb-3">
+            <div class="card-header">
+                <h6 class="mb-0"><i class="bi bi-info-circle"></i> Current Item Info</h6>
+            </div>
+            <div class="card-body">
+                <dl class="row mb-0">
+                    <dt class="col-sm-6">Name:</dt>
+                    <dd class="col-sm-6">{{ item.name }}</dd>
+                    
+                    <dt class="col-sm-6">Category:</dt>
+                    <dd class="col-sm-6"><span class="badge bg-secondary">{{ item.category }}</span></dd>
+                    
+                    <dt class="col-sm-6">Current Stock:</dt>
+                    <dd class="col-sm-6">
+                        <strong class="{% if item.is_low_stock() %}text-danger{% else %}text-success{% endif %}">
+                            {{ item.quantity }} {{ item.unit }}
+                        </strong>
+                    </dd>
+                    
+                    <dt class="col-sm-6">Reorder Level:</dt>
+                    <dd class="col-sm-6">{{ item.reorder_level }} {{ item.unit }}</dd>
+                    
+                    {% if item.supplier %}
+                    <dt class="col-sm-6">Supplier:</dt>
+                    <dd class="col-sm-6">{{ item.supplier }}</dd>
+                    {% endif %}
+                </dl>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0"><i class="bi bi-question-circle"></i> Transaction Types</h6>
+            </div>
+            <div class="card-body">
+                <dl>
+                    <dt>Purchase/Restock</dt>
+                    <dd>Adds inventory from purchases or restocking</dd>
+                    
+                    <dt>Usage/Consumption</dt>
+                    <dd>Deducts inventory used in services or orders</dd>
+                    
+                    <dt>Manual Adjustment</dt>
+                    <dd>Manual corrections to inventory levels</dd>
+                    
+                    <dt>Damage/Loss</dt>
+                    <dd>Deducts inventory due to damage or loss</dd>
+                    
+                    <dt>Return to Supplier</dt>
+                    <dd>Deducts inventory returned to supplier</dd>
+                </dl>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const transactionType = document.getElementById('transaction_type');
+    const quantityInput = document.getElementById('quantity');
+    
+    transactionType.addEventListener('change', function() {
+        const helpText = quantityInput.parentElement.querySelector('.form-text');
+        const type = this.value;
+        
+        if (['usage', 'damage', 'return'].includes(type)) {
+            helpText.textContent = 'This will DEDUCT from current stock. Enter positive value.';
+            helpText.className = 'form-text text-danger';
+        } else {
+            helpText.textContent = 'This will ADD to current stock. Enter positive value.';
+            helpText.className = 'form-text text-success';
+        }
+    });
+</script>
+{% endblock %}

@@ -1,0 +1,126 @@
+{% extends "base.html" %}
+
+{% block title %}Inventory List - Inventory Management{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pb-2 mb-3 border-bottom">
+    <h1 class="h2">Inventory Items</h1>
+    <div>
+        <a href="{{ url_for('inventory_new') }}" class="btn btn-primary">
+            <i class="bi bi-plus-circle"></i> Add New Item
+        </a>
+    </div>
+</div>
+
+<div class="row mb-3">
+    <div class="col-md-12">
+        <form method="get" class="row g-3">
+            <div class="col-md-4">
+                <input type="text" class="form-control" name="search" placeholder="Search by name..." value="{{ search }}">
+            </div>
+            <div class="col-md-3">
+                <select name="category" class="form-select">
+                    <option value="">All Categories</option>
+                    <option value="detergent" {% if category == 'detergent' %}selected{% endif %}>Detergent</option>
+                    <option value="softener" {% if category == 'softener' %}selected{% endif %}>Fabric Softener</option>
+                    <option value="bleach" {% if category == 'bleach' %}selected{% endif %}>Bleach</option>
+                    <option value="stain_remover" {% if category == 'stain_remover' %}selected{% endif %}>Stain Remover</option>
+                    <option value="supplies" {% if category == 'supplies' %}selected{% endif %}>General Supplies</option>
+                    <option value="packaging" {% if category == 'packaging' %}selected{% endif %}>Packaging Materials</option>
+                    <option value="other" {% if category == 'other' %}selected{% endif %}>Other</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <button type="submit" class="btn btn-secondary w-100">
+                    <i class="bi bi-search"></i> Filter
+                </button>
+            </div>
+            <div class="col-md-2">
+                <a href="{{ url_for('inventory_list') }}" class="btn btn-outline-secondary w-100">
+                    <i class="bi bi-x-circle"></i> Clear
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        {% if items %}
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Category</th>
+                        <th>Quantity</th>
+                        <th>Reorder Level</th>
+                        <th>Status</th>
+                        <th>Cost/Unit</th>
+                        <th>Supplier</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in items %}
+                    <tr {% if item.is_low_stock() %}class="table-warning"{% endif %}>
+                        <td>
+                            <a href="{{ url_for('inventory_detail', id=item.id) }}">
+                                {{ item.name }}
+                            </a>
+                            {% if item.is_low_stock() %}
+                            <i class="bi bi-exclamation-triangle text-danger" title="Low stock"></i>
+                            {% endif %}
+                        </td>
+                        <td><span class="badge bg-secondary">{{ item.category }}</span></td>
+                        <td>
+                            <strong>{{ item.quantity }}</strong> {{ item.unit }}
+                        </td>
+                        <td>{{ item.reorder_level }} {{ item.unit }}</td>
+                        <td>
+                            {% if item.quantity == 0 %}
+                                <span class="badge bg-danger">Out of Stock</span>
+                            {% elif item.is_low_stock() %}
+                                <span class="badge bg-warning text-dark">Low Stock</span>
+                            {% elif item.quantity < item.reorder_level * 2 %}
+                                <span class="badge bg-info">Normal</span>
+                            {% else %}
+                                <span class="badge bg-success">In Stock</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if item.cost_per_unit %}
+                                ${{ "%.2f"|format(item.cost_per_unit) }}
+                            {% else %}
+                                -
+                            {% endif %}
+                        </td>
+                        <td>{{ item.supplier or '-' }}</td>
+                        <td>
+                            <div class="btn-group btn-group-sm" role="group">
+                                <a href="{{ url_for('inventory_detail', id=item.id) }}" class="btn btn-outline-primary" title="View">
+                                    <i class="bi bi-eye"></i>
+                                </a>
+                                <a href="{{ url_for('inventory_edit', id=item.id) }}" class="btn btn-outline-secondary" title="Edit">
+                                    <i class="bi bi-pencil"></i>
+                                </a>
+                                <a href="{{ url_for('inventory_adjust', id=item.id) }}" class="btn btn-outline-success" title="Adjust">
+                                    <i class="bi bi-arrows-expand"></i>
+                                </a>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="text-center py-5">
+            <i class="bi bi-inbox display-1 text-muted"></i>
+            <p class="lead text-muted mt-3">No inventory items found.</p>
+            <a href="{{ url_for('inventory_new') }}" class="btn btn-primary">Add Your First Item</a>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

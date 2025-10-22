@@ -5,15 +5,17 @@ import tkinter as tk
 from tkinter import ttk, messagebox
 from datetime import datetime
 import webbrowser
+import json
 
 from database import Database
 from validation import (
-    validate_order_form, show_error, show_success, 
-    show_info, confirm_action
+    validate_order_form, validate_email, validate_required,
+    show_error, show_success, show_info, confirm_action
 )
 from notifications import NotificationManager, NotificationConfig
 from dashboard import DashboardFrame
 from reporting import ReportingFrame
+from laundry_crm.gui.customer_management import CustomerManagementFrame
 
 
 class OrderManagementApp:
@@ -94,6 +96,10 @@ class OrderManagementApp:
         orders_tab = self.create_orders_tab(notebook)
         notebook.add(orders_tab, text="Orders")
 
+        # Customers Tab
+        customer_tab = CustomerManagementFrame(notebook, self.db, self)
+        notebook.add(customer_tab, text="Customers")
+
         # Reporting Tab
         reporting_tab = ReportingFrame(notebook, self.db)
         notebook.add(reporting_tab, text="Reporting")
@@ -134,11 +140,30 @@ class OrderManagementApp:
         self.filter_var = tk.StringVar(value="all")
         filter_combo = ttk.Combobox(toolbar_frame, textvariable=self.filter_var,
                                     state='readonly', width=15)
-        filter_combo['values'] = ('all', 'pending', 'ready', 'completed')
+        filter_combo['values'] = ('all', 'pending', 'scheduled', 'in_progress', 'ready', 'completed', 'cancelled')
         filter_combo.pack(side=tk.LEFT, padx=2)
         filter_combo.bind('<<ComboboxSelected>>', lambda e: self.filter_orders(
-           None if self.filter_var.get() == 'all' else self.filter_var.get()))
-
+            None if self.filter_var.get() == 'all' else self.filter_var.get()))
+        
+        ttk.Label(toolbar_frame, text="Date field:").pack(side=tk.LEFT, padx=(20, 5))
+        self.date_field_var = tk.StringVar(value='created_at')
+        date_field_combo = ttk.Combobox(toolbar_frame, textvariable=self.date_field_var,
+                                        state='readonly', width=18)
+        date_field_combo['values'] = ('created_at', 'scheduled_pickup', 'scheduled_delivery')
+        date_field_combo.pack(side=tk.LEFT, padx=2)
+        
+        ttk.Label(toolbar_frame, text="From:").pack(side=tk.LEFT, padx=(10, 5))
+        self.from_date_entry = ttk.Entry(toolbar_frame, width=12)
+        self.from_date_entry.pack(side=tk.LEFT)
+        
+        ttk.Label(toolbar_frame, text="To:").pack(side=tk.LEFT, padx=(10, 5))
+        self.to_date_entry = ttk.Entry(toolbar_frame, width=12)
+        self.to_date_entry.pack(side=tk.LEFT)
+        
+        ttk.Button(toolbar_frame, text="Apply Filters", command=lambda: self.filter_orders(
+            None if self.filter_var.get() == 'all' else self.filter_var.get()
+        )).pack(side=tk.LEFT, padx=5)
+        
         tree_frame = ttk.Frame(orders_container)
         tree_frame.pack(fill=tk.BOTH, expand=True)
 
@@ -147,8 +172,8 @@ class OrderManagementApp:
 
         tree_scroll_x = ttk.Scrollbar(tree_frame, orient=tk.HORIZONTAL)
         tree_scroll_x.pack(side=tk.BOTTOM, fill=tk.X)
-
-        columns = ('ID', 'Customer', 'Email', 'Phone', 'Item', 'Qty', 'Price', 'Total', 'Status', 'Payment Status', 'Created')
+        
+        columns = ('ID', 'Customer', 'Email', 'Phone', 'Service', 'Item', 'Qty', 'Price', 'Total', 'Status', 'Pickup', 'Delivery', 'Created')
         self.tree = ttk.Treeview(tree_frame, columns=columns, show='headings',
                                 yscrollcommand=tree_scroll_y.set,
                                 xscrollcommand=tree_scroll_x.set)
@@ -160,24 +185,28 @@ class OrderManagementApp:
         self.tree.heading('Customer', text='Customer Name')
         self.tree.heading('Email', text='Email')
         self.tree.heading('Phone', text='Phone')
-        self.tree.heading('Item', text='Item Description')
+        self.tree.heading('Service', text='Service')
+        self.tree.heading('Item', text='Items')
         self.tree.heading('Qty', text='Qty')
         self.tree.heading('Price', text='Price')
         self.tree.heading('Total', text='Total')
         self.tree.heading('Status', text='Status')
-        self.tree.heading('Payment Status', text='Payment Status')
+        self.tree.heading('Pickup', text='Pickup')
+        self.tree.heading('Delivery', text='Delivery')
         self.tree.heading('Created', text='Created At')
 
         self.tree.column('ID', width=50, anchor=tk.CENTER)
         self.tree.column('Customer', width=120)
         self.tree.column('Email', width=150)
         self.tree.column('Phone', width=100)
-        self.tree.column('Item', width=150)
+        self.tree.column('Service', width=120)
+        self.tree.column('Item', width=180)
         self.tree.column('Qty', width=50, anchor=tk.CENTER)
         self.tree.column('Price', width=70, anchor=tk.E)
         self.tree.column('Total', width=80, anchor=tk.E)
-        self.tree.column('Status', width=80, anchor=tk.CENTER)
-        self.tree.column('Payment Status', width=100, anchor=tk.CENTER)
+        self.tree.column('Status', width=100, anchor=tk.CENTER)
+        self.tree.column('Pickup', width=130)
+        self.tree.column('Delivery', width=130)
         self.tree.column('Created', width=130)
 
         self.tree.pack(fill=tk.BOTH, expand=True)
@@ -197,57 +226,78 @@ class OrderManagementApp:
             self.tree.delete(item)
         
         orders = self.db.get_all_orders()
+        service_map = {s['id']: s['name'] for s in self.db.get_service_types()}
         
         for order in orders:
-            created_at = datetime.fromisoformat(order['created_at']).strftime('%Y-%m-%d %H:%M')
+            created_at = datetime.fromisoformat(order['created_at']).strftime('%Y-%m-%d %H:%M') if order.get('created_at') else ''
+            pickup = order.get('scheduled_pickup')
+            pickup_fmt = datetime.fromisoformat(pickup).strftime('%Y-%m-%d %H:%M') if pickup else ''
+            delivery = order.get('scheduled_delivery')
+            delivery_fmt = datetime.fromisoformat(delivery).strftime('%Y-%m-%d %H:%M') if delivery else ''
+            service_name = service_map.get(order.get('service_type')) or ''
             
             values = (
                 order['id'],
                 order['customer_name'],
                 order['customer_email'],
                 order['customer_phone'] or '',
+                service_name,
                 order['item_description'],
                 order['quantity'],
                 f"${order['price']:.2f}",
                 f"${order['total_price']:.2f}",
                 order['status'].upper(),
-                order['payment_status'].replace('_', ' ').title(),
+                pickup_fmt,
+                delivery_fmt,
                 created_at
-                )
-
-                self.tree.insert('', tk.END, values=values, tags=(order['status'], order['payment_status']))
-
-                self.tree.tag_configure('pending', foreground='orange')
-                self.tree.tag_configure('ready', foreground='green')
-                self.tree.tag_configure('completed', foreground='blue')
-                self.tree.tag_configure('unpaid', foreground='red')
-                self.tree.tag_configure('partially_paid', foreground='orange')
-                self.tree.tag_configure('fully_paid', foreground='green')
-
-                self.update_statistics()
-                self.status_label.config(text=f"Loaded {len(orders)} orders")
-
-                def filter_orders(self, status):
-                """Filter orders by status."""
-                for item in self.tree.get_children():
-                self.tree.delete(item)
-
-                orders = self.db.get_all_orders(status)
-
-                for order in orders:
-                created_at = datetime.fromisoformat(order['created_at']).strftime('%Y-%m-%d %H:%M')
-
-                values = (
+            )
+            
+            self.tree.insert('', tk.END, values=values, tags=(order['status'],))
+        
+        self.tree.tag_configure('pending', foreground='orange')
+        self.tree.tag_configure('ready', foreground='green')
+        self.tree.tag_configure('completed', foreground='blue')
+        
+        self.update_statistics()
+        self.status_label.config(text=f"Loaded {len(orders)} orders")
+    
+    def filter_orders(self, status):
+        """Filter orders by status and optional date range."""
+        for item in self.tree.get_children():
+            self.tree.delete(item)
+        
+        # Read optional date filters
+        date_from = getattr(self, 'from_date_entry', None)
+        date_to = getattr(self, 'to_date_entry', None)
+        df = date_from.get().strip() if date_from and date_from.get().strip() else None
+        dt = date_to.get().strip() if date_to and date_to.get().strip() else None
+        date_field = getattr(self, 'date_field_var', None)
+        dfield = date_field.get() if date_field else 'created_at'
+        
+        orders = self.db.get_all_orders(status, df, dt, dfield)
+        service_map = {s['id']: s['name'] for s in self.db.get_service_types()}
+        
+        for order in orders:
+            created_at = datetime.fromisoformat(order['created_at']).strftime('%Y-%m-%d %H:%M') if order.get('created_at') else ''
+            pickup = order.get('scheduled_pickup')
+            pickup_fmt = datetime.fromisoformat(pickup).strftime('%Y-%m-%d %H:%M') if pickup else ''
+            delivery = order.get('scheduled_delivery')
+            delivery_fmt = datetime.fromisoformat(delivery).strftime('%Y-%m-%d %H:%M') if delivery else ''
+            service_name = service_map.get(order.get('service_type')) or ''
+            
+            values = (
                 order['id'],
                 order['customer_name'],
                 order['customer_email'],
                 order['customer_phone'] or '',
+                service_name,
                 order['item_description'],
                 order['quantity'],
                 f"${order['price']:.2f}",
                 f"${order['total_price']:.2f}",
                 order['status'].upper(),
-                order['payment_status'].replace('_', ' ').title(),
+                pickup_fmt,
+                delivery_fmt,
                 created_at
                 )
 
@@ -265,11 +315,11 @@ class OrderManagementApp:
                      f"Revenue: ${stats['total_revenue']:.2f}")
         self.stats_label.config(text=stats_text)
     
-    def show_new_order_dialog(self):
-        """Show dialog to create new order."""
+    def show_new_order_dialog(self, customer=None):
+        """Show dialog to create new order with service type, items, and scheduling."""
         dialog = tk.Toplevel(self.root)
         dialog.title("New Order")
-        dialog.geometry("500x400")
+        dialog.geometry("800x650")
         dialog.transient(self.root)
         dialog.grab_set()
         
@@ -277,48 +327,213 @@ class OrderManagementApp:
         frame.pack(fill=tk.BOTH, expand=True)
         
         ttk.Label(frame, text="Create New Order", style='Header.TLabel').grid(
-            row=0, column=0, columnspan=2, pady=(0, 20))
+            row=0, column=0, columnspan=4, pady=(0, 20), sticky=tk.W)
         
+        # Load reference data
+        service_types = self.db.get_service_types()
+        garment_types = self.db.get_garment_types()
+        service_name_to_id = {s['name']: s['id'] for s in service_types}
+        service_id_to_name = {s['id']: s['name'] for s in service_types}
+        garment_name_to_id = {g['name']: g['id'] for g in garment_types}
+        garment_id_to_name = {g['id']: g['name'] for g in garment_types}
+        garment_multiplier = {g['id']: g['multiplier'] for g in garment_types}
+        service_rate = {s['id']: s['rate'] for s in service_types}
+        
+        # Customer fields
         ttk.Label(frame, text="Customer Name:").grid(row=1, column=0, sticky=tk.W, pady=5)
         name_entry = ttk.Entry(frame, width=30)
-        name_entry.grid(row=1, column=1, pady=5)
+        name_entry.grid(row=1, column=1, pady=5, sticky=tk.W)
+        if customer:
+            name_entry.insert(0, customer.get('name', ''))
         
-        ttk.Label(frame, text="Customer Email:").grid(row=2, column=0, sticky=tk.W, pady=5)
+        ttk.Label(frame, text="Customer Email:").grid(row=1, column=2, sticky=tk.W, pady=5)
         email_entry = ttk.Entry(frame, width=30)
-        email_entry.grid(row=2, column=1, pady=5)
+        email_entry.grid(row=1, column=3, pady=5, sticky=tk.W)
+        if customer:
+            email_entry.insert(0, customer.get('email', ''))
         
-        ttk.Label(frame, text="Customer Phone:").grid(row=3, column=0, sticky=tk.W, pady=5)
+        ttk.Label(frame, text="Customer Phone:").grid(row=2, column=0, sticky=tk.W, pady=5)
         phone_entry = ttk.Entry(frame, width=30)
-        phone_entry.grid(row=3, column=1, pady=5)
+        phone_entry.grid(row=2, column=1, pady=5, sticky=tk.W)
+        if customer:
+            phone_entry.insert(0, customer.get('phone', ''))
         
-        ttk.Label(frame, text="Item Description:").grid(row=4, column=0, sticky=tk.W, pady=5)
-        item_entry = ttk.Entry(frame, width=30)
-        item_entry.grid(row=4, column=1, pady=5)
+        ttk.Label(frame, text="Address:").grid(row=2, column=2, sticky=tk.W, pady=5)
+        address_entry = ttk.Entry(frame, width=30)
+        address_entry.grid(row=2, column=3, pady=5, sticky=tk.W)
+        if customer:
+            address_entry.insert(0, customer.get('address', ''))
         
-        ttk.Label(frame, text="Quantity:").grid(row=5, column=0, sticky=tk.W, pady=5)
-        qty_entry = ttk.Entry(frame, width=30)
-        qty_entry.grid(row=5, column=1, pady=5)
+        # Service selection
+        ttk.Label(frame, text="Service Type:").grid(row=3, column=0, sticky=tk.W, pady=5)
+        service_var = tk.StringVar()
+        service_combo = ttk.Combobox(frame, textvariable=service_var, state='readonly', width=28)
+        service_combo['values'] = [s['name'] for s in service_types]
+        if service_types:
+            service_combo.set(service_types[0]['name'])
+        service_combo.grid(row=3, column=1, pady=5, sticky=tk.W)
         
-        ttk.Label(frame, text="Price per Item:").grid(row=6, column=0, sticky=tk.W, pady=5)
-        price_entry = ttk.Entry(frame, width=30)
-        price_entry.grid(row=6, column=1, pady=5)
+        # Items section
+        ttk.Label(frame, text="Items:").grid(row=4, column=0, sticky=tk.W, pady=(10, 5))
+        items_frame = ttk.Frame(frame)
+        items_frame.grid(row=5, column=0, columnspan=4, sticky='ew')
+        items_frame.grid_columnconfigure(0, weight=1)
+        items_frame.grid_columnconfigure(1, weight=1)
+        items_frame.grid_columnconfigure(2, weight=1)
+        items_frame.grid_columnconfigure(3, weight=0)
+        
+        header = ttk.Frame(items_frame)
+        header.grid(row=0, column=0, columnspan=4, sticky='ew')
+        ttk.Label(header, text='Garment Type', width=25).grid(row=0, column=0, padx=5)
+        ttk.Label(header, text='Quantity', width=10).grid(row=0, column=1, padx=5)
+        ttk.Label(header, text='Instructions', width=40).grid(row=0, column=2, padx=5)
+        
+        item_rows = []
+        
+        def recalc_total(*args):
+            svc_name = service_var.get()
+            svc_id = service_name_to_id.get(svc_name)
+            total = 0.0
+            if not svc_id:
+                total = 0.0
+            else:
+                rate = float(service_rate.get(svc_id, 0.0))
+                for row in item_rows:
+                    if not row.get('active', True):
+                        continue
+                    gname = row['garment_var'].get()
+                    gid = garment_name_to_id.get(gname)
+                    try:
+                        qty = int(row['qty_var'].get() or '0')
+                    except Exception:
+                        qty = 0
+                    mult = float(garment_multiplier.get(gid, 1.0))
+                    total += qty * rate * mult
+            total_var.set(f"${total:.2f}")
+            return total
+        
+        def add_item_row(default_garment=None, default_qty='1', default_instr=''):
+            rindex = len(item_rows) + 1
+            row_frame = ttk.Frame(items_frame)
+            row_frame.grid(row=rindex, column=0, columnspan=4, sticky='ew', pady=2)
+            
+            garment_var = tk.StringVar(value=default_garment or (garment_types[0]['name'] if garment_types else ''))
+            garment_combo = ttk.Combobox(row_frame, textvariable=garment_var, state='readonly', width=25)
+            garment_combo['values'] = [g['name'] for g in garment_types]
+            garment_combo.grid(row=0, column=0, padx=5)
+            garment_combo.bind('<<ComboboxSelected>>', recalc_total)
+            
+            qty_var = tk.StringVar(value=str(default_qty))
+            qty_entry = ttk.Entry(row_frame, textvariable=qty_var, width=8)
+            qty_entry.grid(row=0, column=1, padx=5)
+            qty_entry.bind('<KeyRelease>', recalc_total)
+            
+            instr_entry = ttk.Entry(row_frame, width=50)
+            instr_entry.insert(0, default_instr)
+            instr_entry.grid(row=0, column=2, padx=5)
+            
+            def remove_row():
+                row_frame.grid_forget()
+                row['active'] = False
+                recalc_total()
+            remove_btn = ttk.Button(row_frame, text='Remove', command=remove_row)
+            remove_btn.grid(row=0, column=3, padx=5)
+            
+            row = {
+                'frame': row_frame,
+                'garment_var': garment_var,
+                'qty_var': qty_var,
+                'instr_entry': instr_entry,
+                'active': True
+            }
+            item_rows.append(row)
+            recalc_total()
+        
+        add_item_row()
+        
+        add_item_btn = ttk.Button(frame, text="Add Item", command=lambda: add_item_row())
+        add_item_btn.grid(row=4, column=1, sticky=tk.W, pady=(10, 5))
+        
+        # Scheduling fields
+        ttk.Label(frame, text="Scheduled Pickup (YYYY-MM-DD HH:MM):").grid(row=6, column=0, sticky=tk.W, pady=10)
+        pickup_entry = ttk.Entry(frame, width=25)
+        pickup_entry.grid(row=6, column=1, sticky=tk.W, pady=10)
+        
+        ttk.Label(frame, text="Scheduled Delivery (YYYY-MM-DD HH:MM):").grid(row=6, column=2, sticky=tk.W, pady=10)
+        delivery_entry = ttk.Entry(frame, width=25)
+        delivery_entry.grid(row=6, column=3, sticky=tk.W, pady=10)
+        
+        # Total display
+        total_var = tk.StringVar(value="$0.00")
+        ttk.Label(frame, text="Total:", font=('Arial', 12, 'bold')).grid(row=7, column=2, sticky=tk.E)
+        total_label = ttk.Label(frame, textvariable=total_var, font=('Arial', 12, 'bold'))
+        total_label.grid(row=7, column=3, sticky=tk.W)
         
         def save_order():
-            customer_name = name_entry.get()
-            customer_email = email_entry.get()
-            customer_phone = phone_entry.get()
-            item_description = item_entry.get()
-            quantity = qty_entry.get()
-            price = price_entry.get()
-            
-            if not validate_order_form(customer_name, customer_email, customer_phone,
-                                      item_description, quantity, price):
+            customer_name = name_entry.get().strip()
+            customer_email = email_entry.get().strip()
+            customer_phone = phone_entry.get().strip()
+            address = address_entry.get().strip()
+            svc_name = service_var.get()
+            svc_id = service_name_to_id.get(svc_name)
+            if not validate_required(customer_name, "Customer name"):
                 return
-            
+            if not validate_required(customer_email, "Customer email") or not validate_email(customer_email):
+                show_error("Invalid email address format")
+                return
+            # Build items list
+            items = []
+            for row in item_rows:
+                if not row.get('active', True):
+                    continue
+                gname = row['garment_var'].get()
+                gid = garment_name_to_id.get(gname)
+                try:
+                    qty = int(row['qty_var'].get() or '0')
+                except Exception:
+                    qty = 0
+                instr = row['instr_entry'].get().strip()
+                if gid and qty > 0:
+                    items.append({'garment_type': gid, 'quantity': qty, 'instructions': instr})
+            if not items:
+                show_error("Please add at least one item with quantity > 0")
+                return
+            # Compute totals and summary
+            total_amount = recalc_total()
+            summary = "; ".join([f"{it['quantity']}x {garment_id_to_name.get(it['garment_type'], it['garment_type'])}" for it in items])
+            total_qty = sum(it['quantity'] for it in items)
+            pickup = pickup_entry.get().strip() or None
+            delivery = delivery_entry.get().strip() or None
+            # Basic datetime validation if provided
+            def _parse_dt(s):
+                if not s:
+                    return None
+                try:
+                    return datetime.strptime(s, '%Y-%m-%d %H:%M').isoformat()
+                except Exception:
+                    show_error("Invalid datetime format. Use YYYY-MM-DD HH:MM")
+                    return None
+            pickup_iso = _parse_dt(pickup)
+            if pickup and not pickup_iso:
+                return
+            delivery_iso = _parse_dt(delivery)
+            if delivery and not delivery_iso:
+                return
             try:
                 order_id = self.db.create_order(
-                    customer_name, customer_email, customer_phone,
-                    item_description, int(quantity), float(price)
+                    customer_name=customer_name,
+                    customer_email=customer_email,
+                    customer_phone=customer_phone,
+                    item_description=summary or 'Service Order',
+                    quantity=total_qty,
+                    price=service_rate.get(svc_id, 0.0) if svc_id else 0.0,
+                    service_type=svc_id,
+                    items=items,
+                    instructions=None,
+                    scheduled_pickup=pickup_iso,
+                    scheduled_delivery=delivery_iso,
+                    customer_id=None,
+                    address=address
                 )
                 show_success(f"Order #{order_id} created successfully!")
                 dialog.destroy()
@@ -327,13 +542,13 @@ class OrderManagementApp:
                 show_error(f"Error creating order: {str(e)}")
         
         button_frame = ttk.Frame(frame)
-        button_frame.grid(row=7, column=0, columnspan=2, pady=20)
+        button_frame.grid(row=8, column=0, columnspan=4, pady=20)
         
         ttk.Button(button_frame, text="Save", command=save_order).pack(side=tk.LEFT, padx=5)
         ttk.Button(button_frame, text="Cancel", command=dialog.destroy).pack(side=tk.LEFT, padx=5)
     
     def edit_selected_order(self):
-        """Edit the selected order."""
+        """Edit the selected order with service, items, status, and scheduling."""
         selection = self.tree.selection()
         if not selection:
             show_error("Please select an order to edit")
@@ -349,7 +564,7 @@ class OrderManagementApp:
         
         dialog = tk.Toplevel(self.root)
         dialog.title(f"Edit Order #{order_id}")
-        dialog.geometry("500x400")
+        dialog.geometry("850x700")
         dialog.transient(self.root)
         dialog.grab_set()
         
@@ -357,54 +572,226 @@ class OrderManagementApp:
         frame.pack(fill=tk.BOTH, expand=True)
         
         ttk.Label(frame, text=f"Edit Order #{order_id}", style='Header.TLabel').grid(
-            row=0, column=0, columnspan=2, pady=(0, 20))
+            row=0, column=0, columnspan=4, pady=(0, 20), sticky=tk.W)
         
+        # Reference data
+        service_types = self.db.get_service_types()
+        garment_types = self.db.get_garment_types()
+        service_id_to_name = {s['id']: s['name'] for s in service_types}
+        service_name_to_id = {s['name']: s['id'] for s in service_types}
+        garment_id_to_name = {g['id']: g['name'] for g in garment_types}
+        garment_name_to_id = {g['name']: g['id'] for g in garment_types}
+        garment_multiplier = {g['id']: g['multiplier'] for g in garment_types}
+        service_rate = {s['id']: s['rate'] for s in service_types}
+        
+        # Customer fields
         ttk.Label(frame, text="Customer Name:").grid(row=1, column=0, sticky=tk.W, pady=5)
         name_entry = ttk.Entry(frame, width=30)
         name_entry.insert(0, order['customer_name'])
-        name_entry.grid(row=1, column=1, pady=5)
+        name_entry.grid(row=1, column=1, pady=5, sticky=tk.W)
         
-        ttk.Label(frame, text="Customer Email:").grid(row=2, column=0, sticky=tk.W, pady=5)
+        ttk.Label(frame, text="Customer Email:").grid(row=1, column=2, sticky=tk.W, pady=5)
         email_entry = ttk.Entry(frame, width=30)
         email_entry.insert(0, order['customer_email'])
-        email_entry.grid(row=2, column=1, pady=5)
+        email_entry.grid(row=1, column=3, pady=5, sticky=tk.W)
         
-        ttk.Label(frame, text="Customer Phone:").grid(row=3, column=0, sticky=tk.W, pady=5)
+        ttk.Label(frame, text="Customer Phone:").grid(row=2, column=0, sticky=tk.W, pady=5)
         phone_entry = ttk.Entry(frame, width=30)
         phone_entry.insert(0, order['customer_phone'] or '')
-        phone_entry.grid(row=3, column=1, pady=5)
+        phone_entry.grid(row=2, column=1, pady=5, sticky=tk.W)
         
-        ttk.Label(frame, text="Item Description:").grid(row=4, column=0, sticky=tk.W, pady=5)
-        item_entry = ttk.Entry(frame, width=30)
-        item_entry.insert(0, order['item_description'])
-        item_entry.grid(row=4, column=1, pady=5)
+        # Service selection
+        ttk.Label(frame, text="Service Type:").grid(row=3, column=0, sticky=tk.W, pady=5)
+        service_var = tk.StringVar()
+        service_combo = ttk.Combobox(frame, textvariable=service_var, state='readonly', width=28)
+        service_combo['values'] = [s['name'] for s in service_types]
+        current_service_name = service_id_to_name.get(order.get('service_type')) if order.get('service_type') else (service_types[0]['name'] if service_types else '')
+        if current_service_name:
+            service_combo.set(current_service_name)
+        service_combo.grid(row=3, column=1, pady=5, sticky=tk.W)
         
-        ttk.Label(frame, text="Quantity:").grid(row=5, column=0, sticky=tk.W, pady=5)
-        qty_entry = ttk.Entry(frame, width=30)
-        qty_entry.insert(0, str(order['quantity']))
-        qty_entry.grid(row=5, column=1, pady=5)
+        # Items section
+        ttk.Label(frame, text="Items:").grid(row=4, column=0, sticky=tk.W, pady=(10, 5))
+        items_frame = ttk.Frame(frame)
+        items_frame.grid(row=5, column=0, columnspan=4, sticky='ew')
+        items_frame.grid_columnconfigure(0, weight=1)
+        items_frame.grid_columnconfigure(1, weight=1)
+        items_frame.grid_columnconfigure(2, weight=1)
+        items_frame.grid_columnconfigure(3, weight=0)
         
-        ttk.Label(frame, text="Price per Item:").grid(row=6, column=0, sticky=tk.W, pady=5)
-        price_entry = ttk.Entry(frame, width=30)
-        price_entry.insert(0, str(order['price']))
-        price_entry.grid(row=6, column=1, pady=5)
+        header = ttk.Frame(items_frame)
+        header.grid(row=0, column=0, columnspan=4, sticky='ew')
+        ttk.Label(header, text='Garment Type', width=25).grid(row=0, column=0, padx=5)
+        ttk.Label(header, text='Quantity', width=10).grid(row=0, column=1, padx=5)
+        ttk.Label(header, text='Instructions', width=40).grid(row=0, column=2, padx=5)
+        
+        item_rows = []
+        
+        def recalc_total(*args):
+            svc_name = service_var.get()
+            svc_id = service_name_to_id.get(svc_name)
+            total = 0.0
+            if not svc_id:
+                total = 0.0
+            else:
+                rate = float(service_rate.get(svc_id, 0.0))
+                for row in item_rows:
+                    if not row.get('active', True):
+                        continue
+                    gname = row['garment_var'].get()
+                    gid = garment_name_to_id.get(gname)
+                    try:
+                        qty = int(row['qty_var'].get() or '0')
+                    except Exception:
+                        qty = 0
+                    mult = float(garment_multiplier.get(gid, 1.0))
+                    total += qty * rate * mult
+            total_var.set(f"${total:.2f}")
+            return total
+        
+        def add_item_row(default_garment=None, default_qty='1', default_instr=''):
+            rindex = len(item_rows) + 1
+            row_frame = ttk.Frame(items_frame)
+            row_frame.grid(row=rindex, column=0, columnspan=4, sticky='ew', pady=2)
+            
+            garment_var = tk.StringVar(value=default_garment or (garment_types[0]['name'] if garment_types else ''))
+            garment_combo = ttk.Combobox(row_frame, textvariable=garment_var, state='readonly', width=25)
+            garment_combo['values'] = [g['name'] for g in garment_types]
+            garment_combo.grid(row=0, column=0, padx=5)
+            garment_combo.bind('<<ComboboxSelected>>', recalc_total)
+            
+            qty_var = tk.StringVar(value=str(default_qty))
+            qty_entry = ttk.Entry(row_frame, textvariable=qty_var, width=8)
+            qty_entry.grid(row=0, column=1, padx=5)
+            qty_entry.bind('<KeyRelease>', recalc_total)
+            
+            instr_entry = ttk.Entry(row_frame, width=50)
+            instr_entry.insert(0, default_instr)
+            instr_entry.grid(row=0, column=2, padx=5)
+            
+            def remove_row():
+                row_frame.grid_forget()
+                row['active'] = False
+                recalc_total()
+            remove_btn = ttk.Button(row_frame, text='Remove', command=remove_row)
+            remove_btn.grid(row=0, column=3, padx=5)
+            
+            row = {
+                'frame': row_frame,
+                'garment_var': garment_var,
+                'qty_var': qty_var,
+                'instr_entry': instr_entry,
+                'active': True
+            }
+            item_rows.append(row)
+            recalc_total()
+        
+        # Populate existing items if present
+        try:
+            existing_items = json.loads(order.get('items_json') or '[]')
+        except Exception:
+            existing_items = []
+        if existing_items:
+            for it in existing_items:
+                add_item_row(
+                    default_garment=garment_id_to_name.get(it.get('garment_type')),
+                    default_qty=str(it.get('quantity', 1)),
+                    default_instr=it.get('instructions', '')
+                )
+        else:
+            add_item_row()
+        
+        add_item_btn = ttk.Button(frame, text="Add Item", command=lambda: add_item_row())
+        add_item_btn.grid(row=4, column=1, sticky=tk.W, pady=(10, 5))
+        
+        # Scheduling fields
+        ttk.Label(frame, text="Scheduled Pickup (YYYY-MM-DD HH:MM):").grid(row=6, column=0, sticky=tk.W, pady=10)
+        pickup_entry = ttk.Entry(frame, width=25)
+        pickup_val = order.get('scheduled_pickup')
+        pickup_entry.insert(0, datetime.fromisoformat(pickup_val).strftime('%Y-%m-%d %H:%M') if pickup_val else '')
+        pickup_entry.grid(row=6, column=1, sticky=tk.W, pady=10)
+        
+        ttk.Label(frame, text="Scheduled Delivery (YYYY-MM-DD HH:MM):").grid(row=6, column=2, sticky=tk.W, pady=10)
+        delivery_entry = ttk.Entry(frame, width=25)
+        delivery_val = order.get('scheduled_delivery')
+        delivery_entry.insert(0, datetime.fromisoformat(delivery_val).strftime('%Y-%m-%d %H:%M') if delivery_val else '')
+        delivery_entry.grid(row=6, column=3, sticky=tk.W, pady=10)
+        
+        # Status selection
+        ttk.Label(frame, text="Status:").grid(row=7, column=0, sticky=tk.W, pady=5)
+        status_var = tk.StringVar(value=order.get('status', 'pending'))
+        status_combo = ttk.Combobox(frame, textvariable=status_var, state='readonly', width=20)
+        status_combo['values'] = ('pending', 'scheduled', 'in_progress', 'ready', 'completed', 'cancelled')
+        status_combo.grid(row=7, column=1, sticky=tk.W, pady=5)
+        
+        # Total display
+        total_var = tk.StringVar(value=f"${order.get('total_price', 0.0):.2f}")
+        ttk.Label(frame, text="Total:", font=('Arial', 12, 'bold')).grid(row=8, column=2, sticky=tk.E)
+        total_label = ttk.Label(frame, textvariable=total_var, font=('Arial', 12, 'bold'))
+        total_label.grid(row=8, column=3, sticky=tk.W)
         
         def save_changes():
-            customer_name = name_entry.get()
-            customer_email = email_entry.get()
-            customer_phone = phone_entry.get()
-            item_description = item_entry.get()
-            quantity = qty_entry.get()
-            price = price_entry.get()
-            
-            if not validate_order_form(customer_name, customer_email, customer_phone,
-                                      item_description, quantity, price):
+            customer_name = name_entry.get().strip()
+            customer_email = email_entry.get().strip()
+            customer_phone = phone_entry.get().strip()
+            svc_name = service_var.get()
+            svc_id = service_name_to_id.get(svc_name)
+            if not validate_required(customer_name, "Customer name"):
                 return
-            
+            if not validate_required(customer_email, "Customer email") or not validate_email(customer_email):
+                show_error("Invalid email address format")
+                return
+            # Build items list
+            items = []
+            for row in item_rows:
+                if not row.get('active', True):
+                    continue
+                gname = row['garment_var'].get()
+                gid = garment_name_to_id.get(gname)
+                try:
+                    qty = int(row['qty_var'].get() or '0')
+                except Exception:
+                    qty = 0
+                instr = row['instr_entry'].get().strip()
+                if gid and qty > 0:
+                    items.append({'garment_type': gid, 'quantity': qty, 'instructions': instr})
+            if not items:
+                show_error("Please add at least one item with quantity > 0")
+                return
+            # Compute totals and summary
+            total_amount = recalc_total()
+            summary = "; ".join([f"{it['quantity']}x {garment_id_to_name.get(it['garment_type'], it['garment_type'])}" for it in items])
+            total_qty = sum(it['quantity'] for it in items)
+            pickup = pickup_entry.get().strip() or None
+            delivery = delivery_entry.get().strip() or None
+            def _parse_dt(s):
+                if not s:
+                    return None
+                try:
+                    return datetime.strptime(s, '%Y-%m-%d %H:%M').isoformat()
+                except Exception:
+                    show_error("Invalid datetime format. Use YYYY-MM-DD HH:MM")
+                    return None
+            pickup_iso = _parse_dt(pickup)
+            if pickup and not pickup_iso:
+                return
+            delivery_iso = _parse_dt(delivery)
+            if delivery and not delivery_iso:
+                return
             try:
                 self.db.update_order(
-                    order_id, customer_name, customer_email, customer_phone,
-                    item_description, int(quantity), float(price)
+                    order_id=order_id,
+                    customer_name=customer_name,
+                    customer_email=customer_email,
+                    customer_phone=customer_phone,
+                    item_description=summary or order['item_description'],
+                    quantity=total_qty,
+                    price=service_rate.get(svc_id, 0.0) if svc_id else order['price'],
+                    service_type=svc_id,
+                    items=items,
+                    scheduled_pickup=pickup_iso,
+                    scheduled_delivery=delivery_iso,
+                    status=status_var.get()
                 )
                 show_success(f"Order #{order_id} updated successfully!")
                 dialog.destroy()
@@ -413,7 +800,7 @@ class OrderManagementApp:
                 show_error(f"Error updating order: {str(e)}")
         
         button_frame = ttk.Frame(frame)
-        button_frame.grid(row=7, column=0, columnspan=2, pady=20)
+        button_frame.grid(row=9, column=0, columnspan=4, pady=20)
         
         ttk.Button(button_frame, text="Save", command=save_changes).pack(side=tk.LEFT, padx=5)
         ttk.Button(button_frame, text="Cancel", command=dialog.destroy).pack(side=tk.LEFT, padx=5)
