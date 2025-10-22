@@ -1,277 +1,349 @@
-# Inventory Management System
+# Order Management System
 
-A comprehensive inventory management system designed for laundry and cleaning service businesses to track detergent, supplies, and materials with automated low-stock alerts.
+A comprehensive desktop application for managing orders with customer notifications, built with Python and Tkinter.
 
 ## Features
 
-### 1. Inventory Management
-- **CRUD Operations**: Create, read, update, and delete inventory items
-- **Categorization**: Organize items by category (detergent, fabric softener, bleach, stain remover, supplies, packaging, etc.)
-- **Detailed Tracking**: Track quantity, unit of measurement, reorder levels, cost per unit, and supplier information
+- **Order Management**: Create, edit, delete, and track orders with customer information
+- **Status Tracking**: Manage order lifecycle (Pending → Ready → Completed)
+- **Email Notifications**: Automatic email notifications when orders are marked as ready (SMTP)
+- **SMS Notifications**: SMS notification stubs for future integration with SMS gateways
+- **Input Validation**: Comprehensive form validation for data integrity
+- **Modern GUI**: Clean interface with ttk themes and intuitive navigation
+- **Filtering & Search**: Filter orders by status for easy management
+- **Statistics Dashboard**: Real-time statistics on orders and revenue
+- **Database Persistence**: SQLite database for reliable data storage
 
-### 2. Stock Adjustments
-- **Multiple Transaction Types**:
-  - Purchase/Restock: Add inventory from purchases
-  - Usage/Consumption: Deduct inventory used in services
-  - Manual Adjustment: Correct inventory levels
-  - Damage/Loss: Record damaged or lost items
-  - Return to Supplier: Track returns
-- **Transaction History**: Full audit trail of all inventory movements
-- **Reference Linking**: Link adjustments to service orders or purchase orders
+## Screenshots
 
-### 3. Low-Stock Alerts
-- **Dashboard Alerts**: Visual alerts on the dashboard for items at or below reorder level
-- **Color-Coded Status**: Easy identification of stock levels
-  - Red: Out of stock
-  - Yellow: Low stock (at or below reorder level)
-  - Blue: Normal stock
-  - Green: Well-stocked
-- **Alert Count**: Quick overview of total low-stock items
+The application features:
+- Main dashboard with order list and statistics
+- Create/Edit order dialogs with validation
+- Settings panel for configuring notifications
+- Help and About dialogs
+- Status-based color coding (Pending: Orange, Ready: Green, Completed: Blue)
 
-### 4. Dashboard & Reporting
-- **Key Metrics**: Total items, low-stock count, overall stock level percentage
-- **Recent Transactions**: View the 10 most recent inventory transactions
-- **Low-Stock Summary Table**: Detailed list of all items needing attention
+## Requirements
 
-### 5. REST API
-Full REST API for integration with other systems:
-- `GET /api/inventory` - List all inventory items
-- `POST /api/inventory` - Create new item
-- `GET /api/inventory/<id>` - Get item details
-- `PUT /api/inventory/<id>` - Update item
-- `DELETE /api/inventory/<id>` - Delete item
-- `POST /api/inventory/<id>/adjust` - Adjust inventory quantity
-- `GET /api/inventory/low-stock` - Get low-stock items
-- `POST /api/inventory/<id>/consume` - Consume inventory for service orders
-
-## Technology Stack
-
-- **Backend**: Python 3.x with Flask web framework
-- **Database**: SQLite (easily upgradable to PostgreSQL)
-- **ORM**: SQLAlchemy
-- **Frontend**: Bootstrap 5 with Jinja2 templates
-- **Icons**: Bootstrap Icons
+- Python 3.7 or higher
+- Tkinter (usually included with Python)
+- SQLite3 (included with Python)
 
 ## Installation
 
-### Prerequisites
-- Python 3.7 or higher
-- pip (Python package manager)
+### 1. Clone or Download the Repository
 
-### Setup Steps
-
-1. Clone the repository:
 ```bash
 git clone <repository-url>
-cd <repository-name>
+cd order-management-system
 ```
 
-2. Create a virtual environment:
-```bash
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-```
+### 2. Install Dependencies
 
-3. Install dependencies:
-```bash
-pip install -r requirements.txt
-```
+The application uses only Python standard library modules, so no additional packages are required for basic functionality.
 
-4. Create environment configuration (optional):
-```bash
-cp .env.example .env
-# Edit .env with your configurations if needed
-```
-
-5. Initialize the database and run the application:
-```bash
-python app.py
-```
-
-The application will be available at `http://localhost:5000`
-
-## Usage
-
-### Adding Inventory Items
-
-1. Navigate to **Inventory** in the sidebar
-2. Click **Add New Item**
-3. Fill in the form:
-   - **Name**: Item name (e.g., "Tide Liquid Detergent")
-   - **Category**: Select appropriate category
-   - **Description**: Optional detailed description
-   - **Quantity**: Current stock quantity
-   - **Unit**: Unit of measurement (kg, liters, pieces, etc.)
-   - **Reorder Level**: When to trigger low-stock alert
-   - **Cost Per Unit**: Optional cost tracking
-   - **Supplier**: Optional supplier information
-4. Click **Save Item**
-
-### Adjusting Stock
-
-1. Navigate to an item's detail page
-2. Click **Adjust Stock**
-3. Select transaction type:
-   - **Purchase/Restock**: When receiving new inventory
-   - **Usage/Consumption**: When inventory is used in services
-   - **Manual Adjustment**: For corrections
-   - **Damage/Loss**: For damaged or lost items
-   - **Return to Supplier**: For returns
-4. Enter quantity (always enter positive value; system handles direction)
-5. Optionally add reference information (e.g., "Service Order: SO-123")
-6. Add notes for audit trail
-7. Click **Apply Adjustment**
-
-### Monitoring Low Stock
-
-The **Dashboard** automatically displays:
-- Total number of items below reorder level
-- Highlighted alert banner when low-stock items exist
-- Detailed table of all low-stock items with quick restock buttons
-
-### Consuming Inventory via API
-
-For automated consumption when processing service orders:
+For a clean installation:
 
 ```bash
-curl -X POST http://localhost:5000/api/inventory/<item_id>/consume \
-  -H "Content-Type: application/json" \
-  -d '{
-    "quantity": 2.5,
-    "reference_type": "service_order",
-    "reference_id": "SO-12345",
-    "notes": "Used for customer order"
-  }'
+python3 -m pip install --upgrade pip
 ```
 
-## Database Schema
+### 3. Run the Application
 
-### InventoryItem
-- `id`: Primary key
-- `name`: Item name
-- `category`: Item category
-- `description`: Optional description
-- `quantity`: Current stock level
-- `unit`: Unit of measurement
-- `reorder_level`: Threshold for low-stock alerts
-- `cost_per_unit`: Optional cost per unit
-- `supplier`: Optional supplier name
-- `created_at`: Creation timestamp
-- `updated_at`: Last update timestamp
-
-### InventoryTransaction
-- `id`: Primary key
-- `item_id`: Foreign key to InventoryItem
-- `transaction_type`: Type of transaction
-- `quantity`: Quantity changed (positive or negative)
-- `reference_type`: Optional reference type (e.g., "service_order")
-- `reference_id`: Optional reference ID
-- `notes`: Optional notes
-- `created_at`: Transaction timestamp
-
-### ServiceOrder
-- `id`: Primary key
-- `order_number`: Unique order number
-- `customer_name`: Customer name
-- `service_type`: Type of service
-- `status`: Order status
-- `created_at`: Creation timestamp
-- `completed_at`: Completion timestamp
+```bash
+python3 app.py
+```
 
 ## Configuration
 
-Edit `config.py` or create a `.env` file to customize:
+### Email Notifications (SMTP)
 
-- `SECRET_KEY`: Flask secret key for sessions
-- `DATABASE_URL`: Database connection string (default: SQLite)
-- `LOW_STOCK_THRESHOLD_PERCENTAGE`: Percentage threshold for warnings (default: 10%)
+To enable email notifications:
 
-## API Documentation
+1. Open the application
+2. Go to **File > Settings**
+3. Configure SMTP settings:
+   - **SMTP Server**: Your SMTP server (e.g., `smtp.gmail.com`)
+   - **SMTP Port**: Port number (e.g., `587` for TLS)
+   - **SMTP Username**: Your email address
+   - **SMTP Password**: Your email password or app-specific password
+   - **From Email**: The sender email address
 
-### List All Items
+#### Gmail Configuration Example:
+
+For Gmail users, you'll need to:
+1. Enable 2-factor authentication on your Google account
+2. Generate an app-specific password
+3. Use these settings:
+   - Server: `smtp.gmail.com`
+   - Port: `587`
+   - Username: Your Gmail address
+   - Password: Your app-specific password
+
+### SMS Notifications
+
+SMS notifications are currently implemented as stubs. To integrate with an actual SMS service:
+
+1. Choose an SMS gateway provider (e.g., Twilio, AWS SNS, Vonage)
+2. Obtain API credentials
+3. Enable SMS in **File > Settings**
+4. Enter your API key
+5. Modify `notifications.py` to integrate with your chosen provider
+
+Example integration services:
+- **Twilio**: Popular SMS API with good documentation
+- **AWS SNS**: Amazon's notification service
+- **Vonage (formerly Nexmo)**: SMS and voice API
+- **MessageBird**: Global SMS platform
+
+## Usage Guide
+
+### Creating an Order
+
+1. Click **"New Order"** button or use **File > New Order**
+2. Fill in the required fields:
+   - Customer Name (required)
+   - Customer Email (required, validated)
+   - Customer Phone (optional, validated if provided)
+   - Item Description (required)
+   - Quantity (required, must be positive integer)
+   - Price per Item (required, must be non-negative)
+3. Click **"Save"** to create the order
+
+### Managing Orders
+
+#### Editing an Order
+- Select an order from the list
+- Click **"Edit Order"** or double-click the order
+- Modify the details and click **"Save"**
+
+#### Marking Order as Ready
+- Select a pending order
+- Click **"Mark Ready"**
+- Confirm the action
+- Email and SMS notifications will be sent automatically (if configured)
+
+#### Marking Order as Completed
+- Select a ready order
+- Click **"Mark Completed"**
+- The order will be marked as completed
+
+#### Deleting an Order
+- Select an order
+- Click **"Delete Order"**
+- Confirm the deletion (this action cannot be undone)
+
+### Filtering Orders
+
+Use the **Filter** dropdown to view:
+- **All**: All orders
+- **Pending**: Orders awaiting fulfillment
+- **Ready**: Orders ready for pickup
+- **Completed**: Completed orders
+
+### Keyboard Shortcuts
+
+- **Double-click**: Edit selected order
+- **F5**: Refresh order list
+
+### Statistics
+
+The top-right corner displays real-time statistics:
+- Total number of orders
+- Count by status (Pending, Ready, Completed)
+- Total revenue
+
+## Project Structure
+
 ```
-GET /api/inventory
-Response: Array of inventory items with full details
+order-management-system/
+├── app.py                 # Main application and GUI
+├── database.py           # Database operations and models
+├── validation.py         # Input validation utilities
+├── notifications.py      # Email and SMS notification services
+├── orders.db            # SQLite database (created on first run)
+├── README.md            # This file
+├── requirements.txt     # Python dependencies (if any)
+└── .gitignore          # Git ignore file
 ```
 
-### Get Single Item
-```
-GET /api/inventory/<id>
-Response: Single inventory item with details
+## Module Documentation
+
+### app.py
+Main application file containing the GUI implementation using Tkinter and ttk. Includes:
+- `OrderManagementApp`: Main application class
+- Menu system and toolbar
+- Order creation/editing dialogs
+- Settings dialog for notifications
+- Help and About dialogs
+
+### database.py
+Database layer using SQLite for data persistence. Includes:
+- `Database`: Main database class with CRUD operations
+- Order creation, retrieval, updating, and deletion
+- Statistics calculation
+- Context manager for safe database operations
+
+### validation.py
+Shared validation utilities used across all forms. Includes:
+- Email validation (regex-based)
+- Phone number validation (multiple formats)
+- Required field validation
+- Number validation (positive, non-negative)
+- Order form validation
+- Dialog message helpers (error, warning, info, success, confirm)
+
+### notifications.py
+Notification services for customer communication. Includes:
+- `NotificationConfig`: Configuration class for notification settings
+- `EmailNotificationService`: Email sending via SMTP
+- `SMSNotificationService`: SMS stub implementation
+- `NotificationManager`: Unified interface for all notifications
+
+## Data Model
+
+### Order Schema
+
+```sql
+CREATE TABLE orders (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    customer_name TEXT NOT NULL,
+    customer_email TEXT NOT NULL,
+    customer_phone TEXT,
+    item_description TEXT NOT NULL,
+    quantity INTEGER NOT NULL,
+    price REAL NOT NULL,
+    total_price REAL NOT NULL,
+    status TEXT DEFAULT 'pending',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    ready_at TEXT
+)
 ```
 
-### Create Item
-```
-POST /api/inventory
-Body: {
-  "name": "Item Name",
-  "category": "detergent",
-  "quantity": 100,
-  "unit": "kg",
-  "reorder_level": 20,
-  "description": "Optional",
-  "cost_per_unit": 10.50,
-  "supplier": "Supplier Name"
-}
-Response: Created item with ID
+### Order Status Flow
+
+1. **Pending**: Initial state when order is created
+2. **Ready**: Order is prepared and customer is notified
+3. **Completed**: Order has been picked up/delivered
+
+## Error Handling
+
+The application includes comprehensive error handling:
+- Input validation with user-friendly error messages
+- Database error handling with rollback
+- Notification failure logging
+- Confirmation dialogs for destructive actions
+
+## Security Considerations
+
+⚠️ **Important Security Notes:**
+
+1. **Email Credentials**: 
+   - Credentials are stored in memory only (not persisted)
+   - For production use, consider using environment variables or encrypted configuration files
+   - Use app-specific passwords instead of main account passwords
+
+2. **Database**:
+   - The SQLite database file is stored locally
+   - No encryption is applied by default
+   - Consider encrypting sensitive data for production use
+
+3. **Input Validation**:
+   - All user inputs are validated before database operations
+   - SQL injection protection via parameterized queries
+   - Email and phone format validation
+
+## Troubleshooting
+
+### Email Notifications Not Working
+
+1. **Check SMTP credentials**: Verify server, port, username, and password
+2. **App-specific passwords**: Gmail and some providers require app-specific passwords
+3. **Firewall**: Ensure port 587 (or your SMTP port) is not blocked
+4. **Check logs**: The application logs notification attempts
+5. **Test with a simple email client**: Verify credentials work outside the app
+
+### Database Errors
+
+1. **File permissions**: Ensure write permissions in the application directory
+2. **Corrupted database**: Delete `orders.db` to create a fresh database (data will be lost)
+3. **Locked database**: Close other instances of the application
+
+### GUI Issues
+
+1. **Theme problems**: The app automatically selects available themes
+2. **Display scaling**: Adjust your OS display settings if text appears too small/large
+3. **Tkinter not installed**: Install tkinter for your Python distribution
+
+## Development
+
+### Running Tests
+
+Currently, the application doesn't include automated tests. To add tests:
+
+```bash
+# Install pytest
+pip install pytest
+
+# Create test files
+# tests/test_validation.py
+# tests/test_database.py
+# tests/test_notifications.py
+
+# Run tests
+pytest tests/
 ```
 
-### Update Item
-```
-PUT /api/inventory/<id>
-Body: Partial or full item data
-Response: Updated item
-```
+### Contributing
 
-### Delete Item
-```
-DELETE /api/inventory/<id>
-Response: 204 No Content
-```
+To contribute to this project:
 
-### Adjust Inventory
-```
-POST /api/inventory/<id>/adjust
-Body: {
-  "transaction_type": "usage",
-  "quantity": 5.5,
-  "reference_type": "service_order",
-  "reference_id": "SO-123",
-  "notes": "Optional notes"
-}
-Response: Updated item
-```
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Test thoroughly
+5. Submit a pull request
 
-### Consume Inventory
-```
-POST /api/inventory/<id>/consume
-Body: {
-  "quantity": 2.5,
-  "reference_type": "service_order",
-  "reference_id": "SO-123",
-  "notes": "Optional"
-}
-Response: Updated item
-```
+### Future Enhancements
 
-### Get Low-Stock Items
-```
-GET /api/inventory/low-stock
-Response: Array of items at or below reorder level
-```
-
-## Best Practices
-
-1. **Set Realistic Reorder Levels**: Base reorder levels on actual usage patterns and supplier lead times
-2. **Regular Audits**: Periodically verify physical inventory matches system quantities
-3. **Document Adjustments**: Always add notes when making manual adjustments
-4. **Link Transactions**: Use reference fields to link inventory changes to orders or purchases
-5. **Monitor Dashboard**: Check the dashboard regularly for low-stock alerts
+Potential improvements:
+- Export orders to CSV/PDF
+- Advanced search and filtering
+- Multi-user support with authentication
+- Order history and audit log
+- Barcode/QR code generation for orders
+- Integration with payment gateways
+- Dashboard with charts and analytics
+- Mobile app integration via REST API
+- Print receipts/invoices
 
 ## License
 
-This project is provided as-is for inventory management purposes.
+This project is provided as-is for educational and commercial use.
 
 ## Support
 
-For issues or questions, please refer to the project documentation or contact the development team.
+For issues, questions, or suggestions:
+1. Check the **Help** menu in the application
+2. Review this README thoroughly
+3. Check application logs for error messages
+4. Open an issue in the repository
+
+## Changelog
+
+### Version 1.0.0 (Initial Release)
+- Order creation, editing, and deletion
+- Status management (Pending, Ready, Completed)
+- Email notifications via SMTP
+- SMS notification stubs
+- Input validation across all forms
+- Modern GUI with ttk themes
+- Statistics dashboard
+- SQLite database persistence
+- Help and About dialogs
+- Comprehensive documentation
+
+---
+
+**Built with ❤️ using Python and Tkinter**

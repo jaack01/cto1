@@ -1,242 +1,96 @@
 # Quick Start Guide
 
-Get up and running with the Inventory Management System in 5 minutes!
+Get up and running with the Order Management System in 5 minutes!
 
-## Prerequisites
+## Installation
 
-- Python 3.7 or higher
-- pip (Python package manager)
+1. **Check Python version** (requires Python 3.7+):
+   ```bash
+   python3 --version
+   ```
 
-## Installation & Setup
+2. **Run the application**:
+   ```bash
+   python3 app.py
+   ```
 
-### Option 1: Automated Setup (Recommended)
-
-```bash
-# Make the run script executable (if not already)
-chmod +x run.sh
-
-# Run the application (creates venv, installs dependencies, seeds data)
-./run.sh
-```
-
-The application will be available at: http://localhost:5000
-
-### Option 2: Manual Setup
-
-```bash
-# 1. Create virtual environment
-python3 -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-
-# 2. Install dependencies
-pip install -r requirements.txt
-
-# 3. Seed sample data (optional but recommended for first-time users)
-python seed_data.py
-
-# 4. Run the application
-python app.py
-```
-
-The application will be available at: http://localhost:5000
+That's it! The application will create the database automatically on first run.
 
 ## First Steps
 
-### 1. Access the Dashboard
-Navigate to http://localhost:5000/dashboard
+### 1. Create Your First Order
 
-You'll see:
-- Total inventory items count
-- Low-stock alerts (items needing restock)
-- Recent transaction history
-- Overall stock level percentage
+1. Click **"New Order"** button
+2. Fill in:
+   - Customer Name: `John Doe`
+   - Customer Email: `john@example.com`
+   - Customer Phone: `+1234567890` (optional)
+   - Item Description: `Custom Widget`
+   - Quantity: `2`
+   - Price per Item: `49.99`
+3. Click **"Save"**
 
-### 2. View Inventory
-Click "Inventory" in the sidebar or visit http://localhost:5000/inventory
+### 2. Mark Order as Ready
 
-Features:
-- View all inventory items
-- Filter by category
-- Search by name
-- See stock status (In Stock, Low Stock, Out of Stock)
+1. Select the order you just created
+2. Click **"Mark Ready"**
+3. Confirm the action
+4. Note: Email/SMS notifications require configuration (see below)
 
-### 3. Add Your First Item
-Click "Add New Item" or visit http://localhost:5000/inventory/new
+### 3. Configure Email Notifications (Optional)
 
-Example:
-- **Name**: Tide Liquid Detergent
-- **Category**: Detergent
-- **Quantity**: 50
-- **Unit**: liters
-- **Reorder Level**: 20 (alert triggers when stock reaches this level)
-- **Cost Per Unit**: 12.50 (optional)
-- **Supplier**: P&G Distributors (optional)
+1. Go to **File > Settings**
+2. Enter your SMTP details:
+   - **Gmail users**:
+     - Server: `smtp.gmail.com`
+     - Port: `587`
+     - Username: Your Gmail address
+     - Password: App-specific password ([How to create](https://support.google.com/accounts/answer/185833))
+   - **Other providers**: Use your provider's SMTP settings
+3. Click **"Save"**
 
-### 4. Adjust Inventory
-From any item's detail page:
-1. Click "Adjust Stock"
-2. Choose transaction type:
-   - **Purchase/Restock**: Receiving new inventory
-   - **Usage/Consumption**: Using inventory for services
-   - **Manual Adjustment**: Corrections
-   - **Damage/Loss**: Recording damaged items
-   - **Return to Supplier**: Returning defective items
-3. Enter quantity and optional notes
-4. Submit
-
-## Using the API
-
-### List all items
-```bash
-curl http://localhost:5000/api/inventory
-```
-
-### Get low-stock items
-```bash
-curl http://localhost:5000/api/inventory/low-stock
-```
-
-### Create new item
-```bash
-curl -X POST http://localhost:5000/api/inventory \
-  -H "Content-Type: application/json" \
-  -d '{
-    "name": "New Product",
-    "category": "detergent",
-    "quantity": 100,
-    "unit": "liters",
-    "reorder_level": 25
-  }'
-```
-
-### Consume inventory (for service orders)
-```bash
-curl -X POST http://localhost:5000/api/inventory/1/consume \
-  -H "Content-Type: application/json" \
-  -d '{
-    "quantity": 5.0,
-    "reference_type": "service_order",
-    "reference_id": "SO-123",
-    "notes": "Used for customer order"
-  }'
-```
-
-See [API_DOCUMENTATION.md](API_DOCUMENTATION.md) for complete API reference.
-
-## Sample Data
-
-The system comes with 10 pre-seeded items including:
-- Tide Liquid Detergent (45 liters)
-- Persil Powder Detergent (8 kg) - **LOW STOCK**
-- Downy Fabric Softener (30 liters)
-- Clorox Bleach (12 liters)
-- OxiClean Stain Remover (5 kg) - **LOW STOCK**
-- Dryer Sheets (15 boxes)
-- Laundry Bags (45 pieces)
-- Plastic Garment Bags (250 pieces)
-- Clothes Hangers (180 pieces)
-- Spot Treatment Spray (3 bottles) - **LOW STOCK**
-
-Notice: 3 items are intentionally set at low stock to demonstrate the alert system!
-
-## Integration Example
-
-See how to integrate with your service order system:
-
-```bash
-python service_order_example.py
-```
-
-This demonstrates:
-- Creating service orders
-- Automatically consuming inventory
-- Tracking transactions with reference IDs
-- Monitoring low-stock alerts
-
-## Testing
-
-Run API tests (requires app to be running):
-```bash
-# In terminal 1: Start the app
-python app.py
-
-# In terminal 2: Run tests
-python test_api.py
-```
-
-## Configuration
-
-Edit `config.py` or create a `.env` file:
-
-```env
-FLASK_APP=app.py
-FLASK_ENV=development
-SECRET_KEY=your-secret-key-here
-DATABASE_URL=sqlite:///inventory.db
-```
+Now when you mark orders as ready, customers will receive email notifications!
 
 ## Common Tasks
 
-### Reset Database
-```bash
-rm -f inventory.db
-python seed_data.py
-```
+### View Orders by Status
+Use the **Filter** dropdown:
+- Select "pending" to see pending orders
+- Select "ready" to see ready orders
+- Select "completed" to see completed orders
 
-### Backup Database
-```bash
-cp inventory.db inventory_backup_$(date +%Y%m%d).db
-```
+### Edit an Order
+- **Double-click** the order in the list, OR
+- Select it and click **"Edit Order"**
 
-### View Database Content
-```bash
-python -c "from app import app; from models import db, InventoryItem; 
-with app.app_context():
-    for item in InventoryItem.query.all():
-        print(f'{item.name}: {item.quantity} {item.unit}')
-"
-```
+### Complete an Order
+1. Select a ready order
+2. Click **"Mark Completed"**
 
-## Troubleshooting
+### Delete an Order
+1. Select the order
+2. Click **"Delete Order"**
+3. Confirm the deletion
 
-### Port 5000 already in use
-Change the port in `app.py`:
-```python
-app.run(debug=True, host='0.0.0.0', port=8080)  # Use port 8080 instead
-```
+## Tips
 
-### Module not found errors
-Make sure virtual environment is activated:
-```bash
-source venv/bin/activate  # Linux/Mac
-venv\Scripts\activate     # Windows
-```
+- 📊 **Statistics** are shown in the top-right corner
+- 🎨 **Color coding**: Pending (orange), Ready (green), Completed (blue)
+- ⌨️ **F5** refreshes the order list
+- 📧 **Email notifications** are sent when marking orders as ready
+- 💾 **Auto-save**: All changes are saved immediately to the database
 
-### Database locked error
-Close any other processes using the database:
-```bash
-fuser inventory.db  # Linux: shows processes using the file
-```
+## Need Help?
+
+- Click **Help > Help** in the application menu
+- Check the [full README](README.md) for detailed documentation
+- Review [troubleshooting tips](README.md#troubleshooting)
 
 ## Next Steps
 
-1. **Customize Categories**: Edit `forms.py` to add your specific categories
-2. **Set Realistic Reorder Levels**: Based on your actual usage patterns
-3. **Integrate with Orders**: Use the API to automatically consume inventory when processing orders
-4. **Set Up Monitoring**: Create a cron job to check low-stock items daily
-5. **Add Authentication**: Implement user authentication for production use
+1. Configure email notifications for customer alerts
+2. Explore the statistics dashboard
+3. Try filtering orders by status
+4. Customize the settings to fit your workflow
 
-## Documentation
-
-- [README.md](README.md) - Complete system overview
-- [API_DOCUMENTATION.md](API_DOCUMENTATION.md) - Full API reference
-- [USAGE_EXAMPLES.md](USAGE_EXAMPLES.md) - Detailed usage scenarios
-
-## Support
-
-For questions or issues:
-1. Check the documentation files
-2. Review the example scripts
-3. Examine the sample data and code comments
-
-Happy inventory tracking! 📦
+Happy order managing! 🎉
