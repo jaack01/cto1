@@ -1,0 +1,149 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - Inventory Management{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pb-2 mb-3 border-bottom">
+    <h1 class="h2">Dashboard</h1>
+</div>
+
+<div class="row mb-4">
+    <div class="col-md-4">
+        <div class="card text-center">
+            <div class="card-body">
+                <h5 class="card-title">Total Items</h5>
+                <h2 class="display-4">{{ total_items }}</h2>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card text-center {% if low_stock_count > 0 %}border-danger{% endif %}">
+            <div class="card-body">
+                <h5 class="card-title">Low Stock Alerts</h5>
+                <h2 class="display-4 {% if low_stock_count > 0 %}text-danger{% endif %}">{{ low_stock_count }}</h2>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card text-center">
+            <div class="card-body">
+                <h5 class="card-title">Stock Level</h5>
+                <h2 class="display-4">
+                    {% if total_items > 0 %}
+                        {{ "%.0f"|format(((total_items - low_stock_count) / total_items * 100)) }}%
+                    {% else %}
+                        0%
+                    {% endif %}
+                </h2>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% if low_stock_count > 0 %}
+<div class="alert alert-danger d-flex align-items-center" role="alert">
+    <i class="bi bi-exclamation-triangle-fill me-2"></i>
+    <div>
+        <strong>Warning!</strong> {{ low_stock_count }} item(s) are at or below reorder level. Please review and restock.
+    </div>
+</div>
+
+<div class="card mb-4">
+    <div class="card-header bg-danger text-white">
+        <h5 class="mb-0"><i class="bi bi-exclamation-triangle"></i> Low Stock Items</h5>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Category</th>
+                        <th>Current Quantity</th>
+                        <th>Reorder Level</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in low_stock_items %}
+                    <tr>
+                        <td>
+                            <a href="{{ url_for('inventory_detail', id=item.id) }}">{{ item.name }}</a>
+                        </td>
+                        <td><span class="badge bg-secondary">{{ item.category }}</span></td>
+                        <td>{{ item.quantity }} {{ item.unit }}</td>
+                        <td>{{ item.reorder_level }} {{ item.unit }}</td>
+                        <td>
+                            {% if item.quantity == 0 %}
+                                <span class="badge bg-danger">Out of Stock</span>
+                            {% else %}
+                                <span class="badge bg-warning text-dark">Low Stock</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <a href="{{ url_for('inventory_adjust', id=item.id) }}" class="btn btn-sm btn-primary">
+                                <i class="bi bi-plus-circle"></i> Restock
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<div class="card">
+    <div class="card-header">
+        <h5 class="mb-0"><i class="bi bi-clock-history"></i> Recent Transactions</h5>
+    </div>
+    <div class="card-body">
+        {% if recent_transactions %}
+        <div class="table-responsive">
+            <table class="table table-sm">
+                <thead>
+                    <tr>
+                        <th>Date/Time</th>
+                        <th>Item</th>
+                        <th>Type</th>
+                        <th>Quantity</th>
+                        <th>Notes</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for transaction in recent_transactions %}
+                    <tr>
+                        <td>{{ transaction.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                        <td>
+                            <a href="{{ url_for('inventory_detail', id=transaction.item.id) }}">
+                                {{ transaction.item.name }}
+                            </a>
+                        </td>
+                        <td>
+                            <span class="badge 
+                                {% if transaction.transaction_type == 'purchase' %}bg-success
+                                {% elif transaction.transaction_type == 'usage' %}bg-info
+                                {% elif transaction.transaction_type == 'damage' %}bg-danger
+                                {% else %}bg-secondary{% endif %}">
+                                {{ transaction.transaction_type }}
+                            </span>
+                        </td>
+                        <td>
+                            <span class="{% if transaction.quantity > 0 %}text-success{% else %}text-danger{% endif %}">
+                                {{ "%+.2f"|format(transaction.quantity) }} {{ transaction.item.unit }}
+                            </span>
+                        </td>
+                        <td>{{ transaction.notes or '-' }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p class="text-muted">No transactions yet.</p>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
