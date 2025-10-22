@@ -129,14 +129,16 @@ class OrderManagementApp:
                   command=self.mark_order_ready).pack(side=tk.LEFT, padx=2)
         ttk.Button(toolbar_frame, text="Mark Completed", 
                   command=self.mark_order_completed).pack(side=tk.LEFT, padx=2)
-        ttk.Button(toolbar_frame, text="Delete Order", 
+        ttk.Button(toolbar_frame, text="Delete Order",
                   command=self.delete_selected_order).pack(side=tk.LEFT, padx=2)
-        ttk.Button(toolbar_frame, text="Refresh", 
+        ttk.Button(toolbar_frame, text="Manage Payments",
+                   command=self.show_payment_dialog).pack(side=tk.LEFT, padx=2)
+        ttk.Button(toolbar_frame, text="Refresh",
                   command=self.load_orders).pack(side=tk.LEFT, padx=2)
-        
+
         ttk.Label(toolbar_frame, text="Filter:").pack(side=tk.LEFT, padx=(20, 5))
         self.filter_var = tk.StringVar(value="all")
-        filter_combo = ttk.Combobox(toolbar_frame, textvariable=self.filter_var, 
+        filter_combo = ttk.Combobox(toolbar_frame, textvariable=self.filter_var,
                                     state='readonly', width=15)
         filter_combo['values'] = ('all', 'pending', 'scheduled', 'in_progress', 'ready', 'completed', 'cancelled')
         filter_combo.pack(side=tk.LEFT, padx=2)
@@ -164,10 +166,10 @@ class OrderManagementApp:
         
         tree_frame = ttk.Frame(orders_container)
         tree_frame.pack(fill=tk.BOTH, expand=True)
-        
+
         tree_scroll_y = ttk.Scrollbar(tree_frame, orient=tk.VERTICAL)
         tree_scroll_y.pack(side=tk.RIGHT, fill=tk.Y)
-        
+
         tree_scroll_x = ttk.Scrollbar(tree_frame, orient=tk.HORIZONTAL)
         tree_scroll_x.pack(side=tk.BOTTOM, fill=tk.X)
         
@@ -175,10 +177,10 @@ class OrderManagementApp:
         self.tree = ttk.Treeview(tree_frame, columns=columns, show='headings',
                                 yscrollcommand=tree_scroll_y.set,
                                 xscrollcommand=tree_scroll_x.set)
-        
+
         tree_scroll_y.config(command=self.tree.yview)
         tree_scroll_x.config(command=self.tree.xview)
-        
+
         self.tree.heading('ID', text='ID')
         self.tree.heading('Customer', text='Customer Name')
         self.tree.heading('Email', text='Email')
@@ -192,7 +194,7 @@ class OrderManagementApp:
         self.tree.heading('Pickup', text='Pickup')
         self.tree.heading('Delivery', text='Delivery')
         self.tree.heading('Created', text='Created At')
-        
+
         self.tree.column('ID', width=50, anchor=tk.CENTER)
         self.tree.column('Customer', width=120)
         self.tree.column('Email', width=150)
@@ -206,7 +208,7 @@ class OrderManagementApp:
         self.tree.column('Pickup', width=130)
         self.tree.column('Delivery', width=130)
         self.tree.column('Created', width=130)
-        
+
         self.tree.pack(fill=tk.BOTH, expand=True)
         
         self.tree.bind('<Double-1>', lambda e: self.edit_selected_order())
@@ -297,9 +299,9 @@ class OrderManagementApp:
                 pickup_fmt,
                 delivery_fmt,
                 created_at
-            )
-            
-            self.tree.insert('', tk.END, values=values, tags=(order['status'],))
+                )
+
+                self.tree.insert('', tk.END, values=values, tags=(order['status'],))
         
         self.status_label.config(text=f"Showing {len(orders)} orders")
     
@@ -893,6 +895,148 @@ class OrderManagementApp:
             self.load_orders()
         except Exception as e:
             show_error(f"Error deleting order: {str(e)}")
+
+    def show_payment_dialog(self):
+        """Show payment management dialog for the selected order."""
+        selection = self.tree.selection()
+        if not selection:
+            show_error("Please select an order to manage payments")
+            return
+
+        item = self.tree.item(selection[0])
+        order_id = item['values'][0]
+        order = self.db.get_order(order_id)
+
+        dialog = tk.Toplevel(self.root)
+        dialog.title(f"Payments for Order #{order_id}")
+        dialog.geometry("600x500")
+        dialog.transient(self.root)
+        dialog.grab_set()
+
+        frame = ttk.Frame(dialog, padding="20")
+        frame.pack(fill=tk.BOTH, expand=True)
+
+        ttk.Label(frame, text=f"Manage Payments for Order #{order_id}", style='Header.TLabel').pack(pady=(0, 10))
+
+        # Payment details
+        total_price = order['total_price']
+        payments = self.db.get_payments_for_order(order_id)
+        total_paid = sum(p['amount_paid'] for p in payments)
+        balance_due = total_price - total_paid
+
+        ttk.Label(frame, text=f"Total Amount: ${total_price:.2f}").pack(anchor=tk.W)
+        ttk.Label(frame, text=f"Amount Paid: ${total_paid:.2f}").pack(anchor=tk.W)
+        ttk.Label(frame, text=f"Balance Due: ${balance_due:.2f}").pack(anchor=tk.W, pady=(0, 20))
+
+        # Payment history
+        history_frame = ttk.LabelFrame(frame, text="Payment History", padding="10")
+        history_frame.pack(fill=tk.BOTH, expand=True)
+
+        cols = ('ID', 'Amount', 'Method', 'Date')
+        tree = ttk.Treeview(history_frame, columns=cols, show='headings', height=5)
+        tree.pack(fill=tk.BOTH, expand=True)
+        for col in cols:
+            tree.heading(col, text=col)
+        
+        for p in payments:
+            tree.insert('', 'end', values=(p['id'], f"${p['amount_paid']:.2f}", p['payment_method'], p['payment_date']))
+
+        # Add payment
+        payment_frame = ttk.LabelFrame(frame, text="Add Payment", padding="10")
+        payment_frame.pack(fill=tk.X, pady=10)
+
+        ttk.Label(payment_frame, text="Amount:").grid(row=0, column=0, padx=5, pady=5)
+        amount_entry = ttk.Entry(payment_frame)
+        amount_entry.grid(row=0, column=1, padx=5, pady=5)
+
+        ttk.Label(payment_frame, text="Method:").grid(row=0, column=2, padx=5, pady=5)
+        method_combo = ttk.Combobox(payment_frame, values=['Cash', 'Credit Card', 'Bank Transfer'])
+        method_combo.grid(row=0, column=3, padx=5, pady=5)
+
+        def add_payment():
+            amount = amount_entry.get()
+            method = method_combo.get()
+            if not amount or not method:
+                show_error("Amount and method are required.")
+                return
+            try:
+                amount_val = float(amount)
+                self.db.add_payment(order_id, amount_val, method)
+                show_success("Payment added.")
+                dialog.destroy()
+                self.load_orders()
+            except ValueError:
+                show_error("Invalid amount.")
+            except Exception as e:
+                show_error(f"Error: {e}")
+
+        ttk.Button(payment_frame, text="Add Payment", command=add_payment).grid(row=0, column=4, padx=5, pady=5)
+
+        # Actions
+        action_frame = ttk.Frame(frame)
+        action_frame.pack(pady=10)
+
+        def print_receipt():
+            receipt_content = self.generate_receipt(order, payments)
+            self.show_printable_output("Receipt", receipt_content)
+
+        def print_invoice():
+            invoice_content = self.generate_invoice(order, payments)
+            self.show_printable_output("Invoice", invoice_content)
+
+        ttk.Button(action_frame, text="Print Receipt", command=print_receipt).pack(side=tk.LEFT, padx=5)
+        ttk.Button(action_frame, text="Print Invoice", command=print_invoice).pack(side=tk.LEFT, padx=5)
+
+    def generate_receipt(self, order, payments):
+        total_paid = sum(p['amount_paid'] for p in payments)
+        return f"""
+        *** RECEIPT ***
+        Order ID: {order['id']}
+        Customer: {order['customer_name']}
+        Date: {datetime.now().strftime('%Y-%m-%d %H:%M')}
+        --------------------
+        Item: {order['item_description']}
+        Qty: {order['quantity']}
+        Price: ${order['price']:.2f}
+        Total: ${order['total_price']:.2f}
+        --------------------
+        Amount Paid: ${total_paid:.2f}
+        Balance Due: ${order['total_price'] - total_paid:.2f}
+
+        Thank you for your business!
+        """
+
+    def generate_invoice(self, order, payments):
+        total_paid = sum(p['amount_paid'] for p in payments)
+        return f"""
+        *** INVOICE ***
+        Order ID: {order['id']}
+        Customer: {order['customer_name']}
+        Email: {order['customer_email']}
+        Date: {datetime.now().strftime('%Y-%m-%d')}
+        --------------------
+        Description: {order['item_description']}
+        Quantity: {order['quantity']}
+        Unit Price: ${order['price']:.2f}
+        Total: ${order['total_price']:.2f}
+        --------------------
+        Amount Paid: ${total_paid:.2f}
+        Balance Due: ${order['total_price'] - total_paid:.2f}
+
+        Please remit payment to...
+        """
+
+    def show_printable_output(self, title, content):
+        output_dialog = tk.Toplevel(self.root)
+        output_dialog.title(title)
+        output_dialog.geometry("400x500")
+        
+        text_widget = tk.Text(output_dialog, wrap='word', font=("Courier", 10))
+        text_widget.pack(padx=10, pady=10, fill=tk.BOTH, expand=True)
+        text_widget.insert('1.0', content)
+        text_widget.config(state='disabled')
+        
+        ttk.Button(output_dialog, text="Close", command=output_dialog.destroy).pack(pady=10)
     
     def show_settings_dialog(self):
         """Show settings dialog for configuring notifications."""
