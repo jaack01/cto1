@@ -41,10 +41,68 @@ class Database:
                     status TEXT DEFAULT 'pending',
                     created_at TEXT NOT NULL,
                     updated_at TEXT NOT NULL,
-                    ready_at TEXT
-                )
-            ''')
-            conn.commit()
+                    ready_at TEXT,
+                    payment_status TEXT DEFAULT 'unpaid'
+                    )
+                    ''')
+
+                    cursor.execute('''
+                    CREATE TABLE IF NOT EXISTS payments (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    order_id INTEGER NOT NULL,
+                    amount_paid REAL NOT NULL,
+                    payment_date TEXT NOT NULL,
+                    payment_method TEXT,
+                    FOREIGN KEY (order_id) REFERENCES orders(id)
+                    )
+                    ''')
+                    conn.commit()
+
+                    def add_payment(self, order_id, amount_paid, payment_method):
+                    """Add a payment to an order."""
+                    with self.get_connection() as conn:
+                    cursor = conn.cursor()
+
+                    now = datetime.now().isoformat()
+                    cursor.execute('''
+                    INSERT INTO payments (order_id, amount_paid, payment_date, payment_method)
+                    VALUES (?, ?, ?, ?)
+                    ''', (order_id, amount_paid, now, payment_method))
+
+                    self.update_order_payment_status(order_id, conn)
+                    conn.commit()
+
+                    def get_payments_for_order(self, order_id):
+                    """Get all payments for a given order."""
+                    with self.get_connection() as conn:
+                    cursor = conn.cursor()
+                    cursor.execute('SELECT * FROM payments WHERE order_id = ?', (order_id,))
+                    return [dict(row) for row in cursor.fetchall()]
+
+                    def update_order_payment_status(self, order_id, conn):
+                    """Update the payment status of an order."""
+                    cursor = conn.cursor()
+
+                    cursor.execute('SELECT total_price FROM orders WHERE id = ?', (order_id,))
+                    order = cursor.fetchone()
+                    if not order:
+                    return
+
+                    total_price = order['total_price']
+
+                    cursor.execute('SELECT SUM(amount_paid) as total_paid FROM payments WHERE order_id = ?', (order_id,))
+                    payment_info = cursor.fetchone()
+                    total_paid = payment_info['total_paid'] if payment_info and payment_info['total_paid'] else 0
+
+                    if total_paid >= total_price:
+                    new_status = 'fully_paid'
+                    elif total_paid > 0:
+                    new_status = 'partially_paid'
+                    else:
+                    new_status = 'unpaid'
+
+                    cursor.execute('UPDATE orders SET payment_status = ? WHERE id = ?', (new_status, order_id))
+
     
     def create_order(self, customer_name, customer_email, customer_phone,
                     item_description, quantity, price):
