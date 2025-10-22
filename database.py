@@ -64,6 +64,7 @@ class Database:
                     email TEXT NOT NULL,
                     phone TEXT,
                     address TEXT,
+                    preferences TEXT,
                     created_at TEXT NOT NULL
                 )
                 '''
@@ -169,8 +170,8 @@ class Database:
                 conn.commit()
                 return cust_id
             cur.execute(
-                'INSERT INTO customers (name, email, phone, address, created_at) VALUES (?, ?, ?, ?, ?)',
-                (name, email, phone, address, now),
+                'INSERT INTO customers (name, email, phone, address, created_at, preferences) VALUES (?, ?, ?, ?, ?, ?)',
+                (name, email, phone, address, now, '{}'),
             )
             conn.commit()
             return cur.lastrowid
@@ -182,11 +183,93 @@ class Database:
             row = cur.fetchone()
             return dict(row) if row else None
 
+    def get_all_customers(self):
+        """Get all customers."""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('SELECT * FROM customers ORDER BY name')
+            return [dict(row) for row in cursor.fetchall()]
+
+    def add_customer(self, data):
+        """Add a new customer."""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                'INSERT INTO customers (name, email, phone, address, created_at, preferences) VALUES (?, ?, ?, ?, ?, ?)',
+                (data['name'], data['email'], data.get('phone'), data.get('address'), _now_iso(), '{}')
+            )
+            conn.commit()
+
+    def update_customer(self, customer_id, data):
+        """Update a customer's details."""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                'UPDATE customers SET name = ?, email = ?, phone = ?, address = ? WHERE id = ?',
+                (data['name'], data['email'], data.get('phone'), data.get('address'), customer_id)
+            )
+            conn.commit()
+
+    def delete_customer(self, customer_id):
+        """Delete a customer."""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('DELETE FROM customers WHERE id = ?', (customer_id,))
+            conn.commit()
+
+    def search_customers(self, search_term):
+        """Search for customers by name or email."""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT * FROM customers WHERE name LIKE ? OR email LIKE ? ORDER BY name",
+                (f'%{search_term}%', f'%{search_term}%')
+            )
+            return [dict(row) for row in cursor.fetchall()]
+            
+    def get_customer_by_id(self, customer_id):
+        """Get a single customer by their ID."""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM customers WHERE id = ?", (customer_id,))
+            row = cursor.fetchone()
+            return dict(row) if row else None
+
+    def get_customer_order_history(self, customer_id):
+        """Get the order history for a specific customer."""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT id, created_at, total_price, status FROM orders WHERE customer_id = ? ORDER BY created_at DESC",
+                (customer_id,)
+            )
+            return [dict(row) for row in cursor.fetchall()]
+
     def list_customers(self):
         with self.get_connection() as conn:
             cur = conn.cursor()
             cur.execute('SELECT * FROM customers ORDER BY created_at DESC')
             return [dict(r) for r in cur.fetchall()]
+
+    def get_customer_preferences(self, customer_id):
+        """Get customer preferences."""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT preferences FROM customers WHERE id = ?", (customer_id,))
+            row = cursor.fetchone()
+            if row and row['preferences']:
+                return json.loads(row['preferences'])
+            return {}
+
+    def update_customer_preferences(self, customer_id, preferences):
+        """Update customer preferences."""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "UPDATE customers SET preferences = ? WHERE id = ?",
+                (json.dumps(preferences), customer_id)
+            )
+            conn.commit()
 
     # --------------------------------- Orders --------------------------------
     def _calculate_items_total(self, service_type_id, items):
