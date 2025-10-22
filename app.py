@@ -15,6 +15,7 @@ from validation import (
 from notifications import NotificationManager, NotificationConfig
 from dashboard import DashboardFrame
 from reporting import ReportingFrame
+from laundry_crm.gui.customer_management import CustomerManagementFrame
 
 
 class OrderManagementApp:
@@ -94,6 +95,10 @@ class OrderManagementApp:
         # Orders Tab
         orders_tab = self.create_orders_tab(notebook)
         notebook.add(orders_tab, text="Orders")
+
+        # Customers Tab
+        customer_tab = CustomerManagementFrame(notebook, self.db, self)
+        notebook.add(customer_tab, text="Customers")
 
         # Reporting Tab
         reporting_tab = ReportingFrame(notebook, self.db)
@@ -308,7 +313,7 @@ class OrderManagementApp:
                      f"Revenue: ${stats['total_revenue']:.2f}")
         self.stats_label.config(text=stats_text)
     
-    def show_new_order_dialog(self):
+    def show_new_order_dialog(self, customer=None):
         """Show dialog to create new order with service type, items, and scheduling."""
         dialog = tk.Toplevel(self.root)
         dialog.title("New Order")
@@ -336,18 +341,26 @@ class OrderManagementApp:
         ttk.Label(frame, text="Customer Name:").grid(row=1, column=0, sticky=tk.W, pady=5)
         name_entry = ttk.Entry(frame, width=30)
         name_entry.grid(row=1, column=1, pady=5, sticky=tk.W)
+        if customer:
+            name_entry.insert(0, customer.get('name', ''))
         
         ttk.Label(frame, text="Customer Email:").grid(row=1, column=2, sticky=tk.W, pady=5)
         email_entry = ttk.Entry(frame, width=30)
         email_entry.grid(row=1, column=3, pady=5, sticky=tk.W)
+        if customer:
+            email_entry.insert(0, customer.get('email', ''))
         
         ttk.Label(frame, text="Customer Phone:").grid(row=2, column=0, sticky=tk.W, pady=5)
         phone_entry = ttk.Entry(frame, width=30)
         phone_entry.grid(row=2, column=1, pady=5, sticky=tk.W)
+        if customer:
+            phone_entry.insert(0, customer.get('phone', ''))
         
         ttk.Label(frame, text="Address:").grid(row=2, column=2, sticky=tk.W, pady=5)
         address_entry = ttk.Entry(frame, width=30)
         address_entry.grid(row=2, column=3, pady=5, sticky=tk.W)
+        if customer:
+            address_entry.insert(0, customer.get('address', ''))
         
         # Service selection
         ttk.Label(frame, text="Service Type:").grid(row=3, column=0, sticky=tk.W, pady=5)
