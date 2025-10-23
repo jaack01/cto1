@@ -19,6 +19,9 @@
 # twilio>=8.0.0  # For Twilio SMS integration
 # boto3>=1.26.0  # For AWS SNS SMS integration
 
+# Optional: For building standalone executables
+# pyinstaller>=5.0  # For creating standalone executables
+
 # Optional: For future enhancements
 # reportlab>=3.6.0  # For PDF generation
 # pillow>=9.0.0  # For image handling

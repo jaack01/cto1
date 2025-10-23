@@ -6,6 +6,8 @@ from tkinter import ttk, messagebox
 from datetime import datetime
 import webbrowser
 import json
+import sys
+import os
 
 from database import Database
 from validation import (
@@ -18,11 +20,25 @@ from reporting import ReportingFrame
 from laundry_crm.gui.customer_management import CustomerManagementFrame
 
 
+def get_asset_path(*path_parts):
+    """Return absolute path to an asset, compatible with PyInstaller bundles."""
+    base_path = getattr(sys, '_MEIPASS', os.path.dirname(os.path.abspath(__file__)))
+    return os.path.join(base_path, 'assets', *path_parts)
+
+
 class OrderManagementApp:
     """Main application window for Order Management System."""
     
     def __init__(self, root):
         self.root = root
+
+        icon_path = get_asset_path('app.ico')
+        if os.path.exists(icon_path):
+            try:
+                self.root.iconbitmap(icon_path)
+            except tk.TclError:
+                pass
+
         self.root.title("Order Management System")
         self.root.geometry("1200x800")
         
@@ -299,9 +315,9 @@ class OrderManagementApp:
                 pickup_fmt,
                 delivery_fmt,
                 created_at
-                )
-
-                self.tree.insert('', tk.END, values=values, tags=(order['status'],))
+            )
+            
+            self.tree.insert('', tk.END, values=values, tags=(order['status'],))
         
         self.status_label.config(text=f"Showing {len(orders)} orders")
     
