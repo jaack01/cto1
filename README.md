@@ -54,6 +54,13 @@ python3 -m pip install --upgrade pip
 python3 app.py
 ```
 
+## Application Icon
+
+A placeholder application icon is included at `assets/app.ico`. The Tkinter window
+loads this file at runtime, and all PyInstaller builds embed it as the executable icon.
+Replace this file with your own `.ico` before distributing the application, keeping the
+same path so build scripts and GitHub Actions continue to work as expected.
+
 ## Configuration
 
 ### Email Notifications (SMTP)
@@ -157,14 +164,22 @@ The top-right corner displays real-time statistics:
 
 ```
 order-management-system/
-├── app.py                 # Main application and GUI
+├── assets/
+│   └── app.ico           # Placeholder application icon
+├── .github/
+│   └── workflows/
+│       └── build.yml     # GitHub Actions workflow for builds
+├── app.py                # Main application and GUI
+├── app.spec              # PyInstaller build specification
+├── build.bat             # Windows batch build script
+├── build.ps1             # Windows PowerShell build script
+├── build.sh              # Linux/macOS build script
 ├── database.py           # Database operations and models
 ├── validation.py         # Input validation utilities
 ├── notifications.py      # Email and SMS notification services
-├── orders.db            # SQLite database (created on first run)
-├── README.md            # This file
-├── requirements.txt     # Python dependencies (if any)
-└── .gitignore          # Git ignore file
+├── README.md             # This file
+├── requirements.txt      # Python dependencies (if any)
+└── .gitignore            # Git ignore file
 ```
 
 ## Module Documentation
@@ -275,6 +290,59 @@ The application includes comprehensive error handling:
 1. **Theme problems**: The app automatically selects available themes
 2. **Display scaling**: Adjust your OS display settings if text appears too small/large
 3. **Tkinter not installed**: Install tkinter for your Python distribution
+
+## Building Standalone Executables
+
+The application includes PyInstaller configuration to build standalone executables.
+
+### Prerequisites
+
+```bash
+pip install pyinstaller
+```
+
+### Building on Windows
+
+Run one of the following:
+
+```cmd
+build.bat
+```
+
+Or with PowerShell:
+
+```powershell
+.\build.ps1
+```
+
+### Building on Linux/macOS
+
+```bash
+chmod +x build.sh
+./build.sh
+```
+
+### Customizing the Icon
+
+The application uses `assets/app.ico` as its icon:
+- Replace the placeholder icon with your own before building
+- The icon file must be in `.ico` format for Windows executables
+- Linux and macOS builds also embed the icon
+- Keep the file path as `assets/app.ico` to avoid changing build configs
+
+### GitHub Actions
+
+The repository includes a GitHub Actions workflow (`.github/workflows/build.yml`) that:
+- Builds executables for Windows, Linux, and macOS on every push
+- Creates release artifacts when you push a version tag (e.g., `v1.0.0`)
+- Uses the same icon configuration for all platforms
+
+To create a release with executables:
+
+```bash
+git tag v1.0.0
+git push origin v1.0.0
+```
 
 ## Development
 
