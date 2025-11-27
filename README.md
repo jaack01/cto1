@@ -348,7 +348,9 @@ git push origin v1.0.0
 
 ### Running Tests
 
-Currently, the application doesn't include automated tests. To add tests:
+#### Python backend
+
+The legacy Tkinter application does not yet include automated Python tests. To add coverage:
 
 ```bash
 # Install pytest
@@ -362,6 +364,23 @@ pip install pytest
 # Run tests
 pytest tests/
 ```
+
+#### React/Zustand dashboard sample
+
+A lightweight React testing harness is included for the web dashboard and Zustand store that back the Tauri shell. It uses Vitest with React Testing Library and runs entirely in a JSDOM environment.
+
+```bash
+# Install Node dependencies (first run only)
+npm install
+
+# Execute the component and store tests in CI-friendly mode
+npm test
+```
+
+The sample suite demonstrates:
+- Rendering dashboard statistics from mocked order data
+- Validating and submitting the order form via the Zustand store
+- Exercising store actions with mocked fetch/create implementations
 
 ### Contributing
 
